@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- Исполняемый пример; упаковка в NuGet отключена. -->
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <!-- Generic Host предоставляет DI, конфигурацию и управление жизненным циклом приложения. -->
+    <ItemGroup>
+        <PackageReference Include="JetBrains.Annotations" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" />
+    </ItemGroup>
+
+    <!-- Ссылка на исходный проект позволяет запускать пример с локальными изменениями Inbox. -->
+    <ItemGroup>
+        <ProjectReference Include="../../src/MonixOne.Inbox/MonixOne.Inbox.csproj" />
+    </ItemGroup>
+
+    <!-- Настройки копируются в каталог сборки, если исходный файл новее. -->
+    <ItemGroup>
+        <None Update="appsettings.json">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+</Project>

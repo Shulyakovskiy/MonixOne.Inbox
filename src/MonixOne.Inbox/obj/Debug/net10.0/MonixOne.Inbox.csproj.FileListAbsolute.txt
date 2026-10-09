@@ -1,0 +1,15 @@
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/bin/Debug/net10.0/MonixOne.Inbox.deps.json
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/bin/Debug/net10.0/MonixOne.Inbox.dll
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/bin/Debug/net10.0/MonixOne.Inbox.pdb
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/bin/Debug/net10.0/MonixOne.Inbox.xml
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/obj/Debug/net10.0/MonixOne.Inbox.csproj.AssemblyReference.cache
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/obj/Debug/net10.0/MonixOne.Inbox.GeneratedMSBuildEditorConfig.editorconfig
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/obj/Debug/net10.0/MonixOne.Inbox.AssemblyInfoInputs.cache
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/obj/Debug/net10.0/MonixOne.Inbox.AssemblyInfo.cs
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/obj/Debug/net10.0/MonixOne.Inbox.csproj.CoreCompileInputs.cache
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/obj/Debug/net10.0/MonixOne.Inbox.sourcelink.json
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/obj/Debug/net10.0/MonixOne.Inbox.dll
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/obj/Debug/net10.0/refint/MonixOne.Inbox.dll
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/obj/Debug/net10.0/MonixOne.Inbox.xml
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/obj/Debug/net10.0/MonixOne.Inbox.pdb
+/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/obj/Debug/net10.0/ref/MonixOne.Inbox.dll

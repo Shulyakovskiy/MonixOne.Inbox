@@ -1,0 +1,48 @@
+<Project>
+    <PropertyGroup>
+
+        <!-- ========================= -->
+        <!-- Target / Language -->
+        <!-- ========================= -->
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- ========================= -->
+        <!-- Build behavior -->
+        <!-- ========================= -->
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <WarningsAsErrors/>
+
+        <!-- Оставляем только разумные исключения -->
+        <NoWarn>
+            $(NoWarn);
+            CS1591; <!-- XML comments -->
+        </NoWarn>
+
+        <!-- ========================= -->
+        <!-- Performance / correctness -->
+        <!-- ========================= -->
+        <Deterministic>true</Deterministic>
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+        <DebugType>portable</DebugType>
+        <DebugSymbols>true</DebugSymbols>
+
+        <!-- ========================= -->
+        <!-- Code analysis -->
+        <!-- ========================= -->
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+        <AnalysisLevel>latest</AnalysisLevel>
+        <AnalysisMode>Default</AnalysisMode>
+
+        <!-- ========================= -->
+        <!-- Nullable enforcement -->
+        <!-- ========================= -->
+        <WarningsAsErrors>
+            $(WarningsAsErrors);
+            CS8600;CS8602;CS8603;CS8604;
+        </WarningsAsErrors>
+
+    </PropertyGroup>
+</Project>

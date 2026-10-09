@@ -1,0 +1,81 @@
+name: Publish package
+
+on:
+  # Publish only when a pull request has been merged into main.
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Test and publish
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # This name must match the environment in the NuGet trusted publishing policy.
+    environment: production
+    permissions:
+      contents: read
+      # Required by NuGet/login to exchange GitHub OIDC for a temporary NuGet API key.
+      id-token: write
+
+    steps:
+      - name: Checkout merged commit
+        uses: actions/checkout@v4
+        with:
+          # Publish this PR's merge result even if main advances while the job waits.
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Verify Docker for Testcontainers
+        run: |
+          docker version
+          docker info
+          docker pull postgres:18-alpine
+          docker pull nats:2.12-alpine
+
+      - name: Restore
+        run: dotnet restore MonixOne.Inbox.sln --disable-parallel
+
+      - name: Build
+        run: >-
+          dotnet build MonixOne.Inbox.sln --configuration Release --no-restore
+          --disable-build-servers -m:1 -p:GeneratePackageOnBuild=false
+
+      - name: Test, including PostgreSQL and NATS integration
+        # The publication job verifies the exact commit it will pack.
+        run: >-
+          dotnet test --project tests/MonixOne.Inbox.Tests/MonixOne.Inbox.Tests.csproj
+          --configuration Release --no-build --no-restore --
+          --minimum-expected-tests 183 --no-ansi --progress off
+
+      - name: Pack
+        run: >-
+          dotnet pack src/MonixOne.Inbox/MonixOne.Inbox.csproj
+          --configuration Release --no-build --no-restore --output artifacts/nuget
+          -p:GeneratePackageOnBuild=false
+
+      - name: NuGet login
+        id: nuget_login
+        uses: NuGet/login@v1
+        with:
+          # NuGet profile name, not email or a permanent API key.
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push package and symbols
+        env:
+          NUGET_TEMPORARY_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
+        # NuGet CLI sends the adjacent .snupkg along with the .nupkg.
+        run: >-
+          dotnet nuget push "artifacts/nuget/*.nupkg"
+          --api-key "$NUGET_TEMPORARY_API_KEY"
+          --source https://api.nuget.org/v3/index.json --skip-duplicate
