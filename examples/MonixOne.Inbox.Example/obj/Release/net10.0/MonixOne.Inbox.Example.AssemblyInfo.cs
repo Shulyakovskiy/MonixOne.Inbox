@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MonixOne.Inbox.Example")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a4928411e96acfcbae31d6d9d9dcbcdb50e636fe")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9c69309f4c515cc845692f67f003ebff1c2c8012")]
 [assembly: System.Reflection.AssemblyProductAttribute("MonixOne.Inbox.Example")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MonixOne.Inbox.Example")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
