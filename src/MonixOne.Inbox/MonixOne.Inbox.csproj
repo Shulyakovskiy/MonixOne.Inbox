@@ -1,12 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Description>Ordered inbox for EF Core, PostgreSQL and NATS JetStream.</Description>
-    <Version>0.1.0-alpha.1</Version>
+    <Version>1.1.0</Version>
     <IsPackable>true</IsPackable>
     <PackageId>MonixOne.Inbox</PackageId>
     <Authors>MonixOne</Authors>
     <PackageTags>inbox;PostgreSQL;NATS;EFCore;ordered</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <_InboxPackageReadmePath>$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/nuget/README.md</_InboxPackageReadmePath>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -25,6 +26,36 @@
     <InternalsVisibleTo Include="MonixOne.Inbox.Tests" />
     <EmbeddedResource Include="Migrations/*.sql" />
     <Content Include="Migrations/*.sql" Pack="true" PackagePath="tools/migrations" />
-    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../README.md" />
+    <None Include="$(_InboxPackageReadmePath)" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="../../docs/event-processing.png" Pack="true" PackagePath="docs/" />
+    <None Include="../../docs/event-processing.svg" Pack="true" PackagePath="docs/" />
   </ItemGroup>
+  <!-- NuGet.org требует абсолютные URL изображений; локальный README сохраняет относительные ссылки. -->
+  <UsingTask TaskName="WriteInboxPackageReadme" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <SourceFile ParameterType="System.String" Required="true" />
+      <DestinationFile ParameterType="System.String" Required="true" />
+      <ImageBaseUrl ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        // File IO preserves backslashes in JSON examples; MSBuild item values may normalize them as paths.
+        var content = File.ReadAllText(SourceFile)
+            .Replace("(docs/event-processing.png)", "(" + ImageBaseUrl + "event-processing.png)")
+            .Replace("(docs/event-processing.svg)", "(" + ImageBaseUrl + "event-processing.svg)");
+        var destination = Path.GetFullPath(DestinationFile);
+        Directory.CreateDirectory(Path.GetDirectoryName(destination));
+        if (!File.Exists(destination) || File.ReadAllText(destination) != content)
+            File.WriteAllText(destination, content, new System.Text.UTF8Encoding(false));
+      ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="PrepareInboxPackageReadme" BeforeTargets="_GetPackageFiles">
+    <WriteInboxPackageReadme SourceFile="$(MSBuildThisFileDirectory)../../README.md"
+                             DestinationFile="$(_InboxPackageReadmePath)"
+                             ImageBaseUrl="https://raw.githubusercontent.com/Shulyakovskiy/MonixOne.Inbox/main/docs/" />
+  </Target>
 </Project>

@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "MonixOne.Inbox/0.1.0-alpha.1": {
+      "MonixOne.Inbox/1.1.0": {
         "dependencies": {
           "Microsoft.EntityFrameworkCore.Relational": "10.0.12",
           "Microsoft.Extensions.Configuration.Binder": "10.0.12",
@@ -309,7 +309,7 @@
     }
   },
   "libraries": {
-    "MonixOne.Inbox/0.1.0-alpha.1": {
+    "MonixOne.Inbox/1.1.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

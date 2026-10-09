@@ -1219,8 +1219,8 @@
         },
         "runtime": {
           "MonixOne.Inbox.dll": {
-            "assemblyVersion": "0.1.0.0",
-            "fileVersion": "0.1.0.0"
+            "assemblyVersion": "1.1.0.0",
+            "fileVersion": "1.1.0.0"
           }
         }
       }
