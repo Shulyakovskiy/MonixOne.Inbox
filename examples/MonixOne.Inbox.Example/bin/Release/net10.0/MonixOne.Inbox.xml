@@ -1,0 +1,908 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>MonixOne.Inbox</name>
+    </assembly>
+    <members>
+        <member name="T:MonixOne.Inbox.IInboxEnvelopeAdapter">
+            <summary>Scoped-адаптер метаданных нестандартного envelope. Полный JSON сохраняется неизменным.</summary>
+        </member>
+        <member name="T:MonixOne.Inbox.InboxEventMetadata">
+            <summary>
+            Идентичность факта и исходная sequence, извлечённые из полного сообщения.
+            </summary>
+            <param name="EventId">
+            Уникальный id факта внутри handler, до 512 UTF-8 байт.
+            </param>
+            <param name="Producer">
+            Источник счётчика, до 256 UTF-8 байт.
+            </param>
+            <param name="SequenceScope">
+            Область исходной нумерации, до 256 UTF-8 байт.
+            </param>
+            <param name="ObjectKey">
+            Ключ объекта с необходимой tenant/type областью, до 1024 UTF-8 байт.
+            </param>
+            <param name="Sequence">
+            Положительный Int64 номер источника; начинается с любого положительного номера.
+            </param>
+            <param name="EventType">
+            Непустое имя типа события.
+            </param>
+            <param name="OccurredAt">
+            Время факта; при сохранении нормализуется в UTC и до микросекунд.
+            </param>
+        </member>
+        <member name="M:MonixOne.Inbox.InboxEventMetadata.#ctor(System.String,System.String,System.String,System.String,System.Int64,System.String,System.DateTimeOffset)">
+            <summary>
+            Идентичность факта и исходная sequence, извлечённые из полного сообщения.
+            </summary>
+            <param name="EventId">
+            Уникальный id факта внутри handler, до 512 UTF-8 байт.
+            </param>
+            <param name="Producer">
+            Источник счётчика, до 256 UTF-8 байт.
+            </param>
+            <param name="SequenceScope">
+            Область исходной нумерации, до 256 UTF-8 байт.
+            </param>
+            <param name="ObjectKey">
+            Ключ объекта с необходимой tenant/type областью, до 1024 UTF-8 байт.
+            </param>
+            <param name="Sequence">
+            Положительный Int64 номер источника; начинается с любого положительного номера.
+            </param>
+            <param name="EventType">
+            Непустое имя типа события.
+            </param>
+            <param name="OccurredAt">
+            Время факта; при сохранении нормализуется в UTC и до микросекунд.
+            </param>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxEventMetadata.EventId">
+            <summary>
+            Уникальный id факта внутри handler, до 512 UTF-8 байт.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxEventMetadata.Producer">
+            <summary>
+            Источник счётчика, до 256 UTF-8 байт.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxEventMetadata.SequenceScope">
+            <summary>
+            Область исходной нумерации, до 256 UTF-8 байт.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxEventMetadata.ObjectKey">
+            <summary>
+            Ключ объекта с необходимой tenant/type областью, до 1024 UTF-8 байт.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxEventMetadata.Sequence">
+            <summary>
+            Положительный Int64 номер источника; начинается с любого положительного номера.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxEventMetadata.EventType">
+            <summary>
+            Непустое имя типа события.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxEventMetadata.OccurredAt">
+            <summary>
+            Время факта; при сохранении нормализуется в UTC и до микросекунд.
+            </summary>
+        </member>
+        <member name="M:MonixOne.Inbox.IInboxHandler`1.HandleAsync(`0,System.Text.Json.JsonElement,System.Threading.CancellationToken)">
+            <summary>
+            Applies one event using the application context from the current attempt's scope.
+            </summary>
+            <remarks>
+            The package owns the transaction and context lifetime. Only Applied commits business changes;
+            other results roll them back. External side effects must use the application's transactional outbox.
+            The same event can invoke this callback concurrently on different replicas; only one transaction commits.
+            Keep all writes in the supplied context/transaction, honor cancellation and await all work before returning.
+            </remarks>
+        </member>
+        <member name="T:MonixOne.Inbox.InboxAdministration`1">
+            <summary>
+            Scoped API чтения истории.
+            Используйте отдельный DI scope вне бизнес-транзакции обработчика.
+            Миграции выполняются при запуске host; API не создаёт таблицы неявно.
+            </summary>
+        </member>
+        <member name="M:MonixOne.Inbox.InboxAdministration`1.ReadHistoryAsync(System.Guid,System.Int64,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Читает событие, состояние sequence и страницу истории всех его прогонов.
+            Все запросы страницы выполняются в одной RepeatableRead-транзакции.
+            </summary>
+            <param name="inboxId">
+            Id сохранённого события. Для неизвестного id возвращается null.
+            </param>
+            <param name="afterJournalId">
+            Исключительная нижняя граница id журнала; 0 для первой страницы.
+            Для продолжения передайте NextJournalId предыдущей страницы.
+            </param>
+            <param name="pageSize">
+            Количество записей журнала, от 1 до 200; по умолчанию 50.
+            Связанные попытки и DLQ загружаются пакетными запросами.
+            </param>
+            <param name="cancellationToken">
+            Отмена чтения и ожидания подключения к БД.
+            </param>
+        </member>
+        <member name="M:MonixOne.Inbox.InboxAdministration`1.ReadDeadLetterAsync(System.Guid,System.Int64,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Читает выбранную DLQ-запись и историю связанного оригинала.
+            Для invalid_message история доступна без записи inbox.
+            При конфликте journal содержит ссылки на затронутые оригиналы;
+            их полную историю можно отдельно прочитать через ReadHistoryAsync.
+            </summary>
+            <param name="deadLetterId">
+            Id DLQ-записи. Для неизвестного id возвращается null.
+            </param>
+            <param name="afterJournalId">
+            Исключительная нижняя граница id журнала; 0 для первой страницы.
+            </param>
+            <param name="pageSize">
+            Количество записей журнала, от 1 до 200; по умолчанию 50.
+            </param>
+            <param name="cancellationToken">
+            Отмена чтения и ожидания подключения к БД.
+            </param>
+        </member>
+        <member name="T:MonixOne.Inbox.InboxDiagnostics">
+            <summary>
+            Scoped-журнал текущей бизнес-попытки. Доступен handler и его зависимостям через DI.
+            Записи фиксируются вместе с итогом попытки, в том числе после бизнес-rollback.
+            До commit записи недолговечны; crash, отмена host или потеря транзакции их не сохраняют.
+            </summary>
+        </member>
+        <member name="M:MonixOne.Inbox.InboxDiagnostics.#ctor(Microsoft.Extensions.Logging.ILogger{MonixOne.Inbox.InboxDiagnostics})">
+            <summary>
+            Scoped-журнал текущей бизнес-попытки. Доступен handler и его зависимостям через DI.
+            Записи фиксируются вместе с итогом попытки, в том числе после бизнес-rollback.
+            До commit записи недолговечны; crash, отмена host или потеря транзакции их не сохраняют.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxDiagnostics.AttemptId">
+            <summary>
+            Id активной попытки для корреляции; null вне вызова handler.
+            </summary>
+        </member>
+        <member name="M:MonixOne.Inbox.InboxDiagnostics.Write(System.String,System.String,System.Nullable{System.Text.Json.JsonElement},Microsoft.Extensions.Logging.LogLevel,System.Exception)">
+            <summary>
+            Добавляет структурированную диагностику и передаёт её в обычный ILogger.
+            JSON копируется сразу; данные сохраняются после освобождения исходного JsonDocument.
+            Превышение лимита 128 записей / 64 KiB отмечается diagnostics.truncated и не меняет бизнес-результат.
+            </summary>
+            <param name="code">
+            Непустой машинный код диагностического сообщения.
+            </param>
+            <param name="message">
+            Непустое пояснение. Не передавайте credentials и secrets.
+            </param>
+            <param name="details">
+            Необязательные JSON-данные. Default: null. Приложение выбирает безопасные для журнала поля.
+            </param>
+            <param name="level">
+            Уровень ILogger и долговечной записи. Default: Information; None недопустим.
+            </param>
+            <param name="exception">
+            Необязательная ошибка для ILogger и полного Exception.ToString() в журнале. Default: null.
+            </param>
+        </member>
+        <member name="M:MonixOne.Inbox.InboxDiagnostics.Dispose">
+            <summary>
+            Завершает сбор и освобождает буфер scope. Поздние записи в завершённую попытку недопустимы.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.InboxHistoryPage">
+            <summary>
+            Согласованный снимок события и страница его долговечной истории.
+            JSON содержит имена полей в snake_case; raw_payload представлен в Base64.
+            </summary>
+            <param name="Inbox">
+            Исходное событие и текущий статус, включая run_id и бюджет попыток.
+            Null для некорректного сообщения, которое не попало в inbox.
+            </param>
+            <param name="ConsumerState">
+            Текущий nullable cursor и version по ключу события.
+            Null, если у сообщения нет соответствующей записи inbox.
+            </param>
+            <param name="DeadLetter">
+            Выбранная DLQ-запись при чтении по её id.
+            При чтении по inbox_id DLQ-записи доступны через Entries.
+            </param>
+            <param name="Entries">
+            Записи журнала по возрастанию id с полными связанными попытками и DLQ.
+            История включает все run_id, а не только текущий прогон.
+            </param>
+            <param name="NextJournalId">
+            Последний возвращённый id для следующей страницы.
+            Null, если в текущем снимке больше записей нет.
+            </param>
+        </member>
+        <member name="M:MonixOne.Inbox.InboxHistoryPage.#ctor(System.Nullable{System.Text.Json.JsonElement},System.Nullable{System.Text.Json.JsonElement},System.Nullable{System.Text.Json.JsonElement},System.Collections.Generic.IReadOnlyList{MonixOne.Inbox.InboxHistoryEntry},System.Nullable{System.Int64})">
+            <summary>
+            Согласованный снимок события и страница его долговечной истории.
+            JSON содержит имена полей в snake_case; raw_payload представлен в Base64.
+            </summary>
+            <param name="Inbox">
+            Исходное событие и текущий статус, включая run_id и бюджет попыток.
+            Null для некорректного сообщения, которое не попало в inbox.
+            </param>
+            <param name="ConsumerState">
+            Текущий nullable cursor и version по ключу события.
+            Null, если у сообщения нет соответствующей записи inbox.
+            </param>
+            <param name="DeadLetter">
+            Выбранная DLQ-запись при чтении по её id.
+            При чтении по inbox_id DLQ-записи доступны через Entries.
+            </param>
+            <param name="Entries">
+            Записи журнала по возрастанию id с полными связанными попытками и DLQ.
+            История включает все run_id, а не только текущий прогон.
+            </param>
+            <param name="NextJournalId">
+            Последний возвращённый id для следующей страницы.
+            Null, если в текущем снимке больше записей нет.
+            </param>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryPage.Inbox">
+            <summary>
+            Исходное событие и текущий статус, включая run_id и бюджет попыток.
+            Null для некорректного сообщения, которое не попало в inbox.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryPage.ConsumerState">
+            <summary>
+            Текущий nullable cursor и version по ключу события.
+            Null, если у сообщения нет соответствующей записи inbox.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryPage.DeadLetter">
+            <summary>
+            Выбранная DLQ-запись при чтении по её id.
+            При чтении по inbox_id DLQ-записи доступны через Entries.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryPage.Entries">
+            <summary>
+            Записи журнала по возрастанию id с полными связанными попытками и DLQ.
+            История включает все run_id, а не только текущий прогон.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryPage.NextJournalId">
+            <summary>
+            Последний возвращённый id для следующей страницы.
+            Null, если в текущем снимке больше записей нет.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.InboxHistoryEntry">
+            <summary>
+            Запись истории с долговечными доказательствами соответствующего решения.
+            JSON-значения независимы от DbContext и не требуют Dispose.
+            </summary>
+            <param name="JournalId">
+            Монотонный id записи журнала, используемый для пагинации.
+            Пропуски id после отката транзакций допустимы.
+            </param>
+            <param name="Journal">
+            Решение, время, worker, ссылки на inbox/attempt/DLQ и структурированные детали.
+            </param>
+            <param name="Attempt">
+            Полная зафиксированная попытка с diagnostics, исключением и настройками.
+            Null для решений без бизнес-вызова.
+            </param>
+            <param name="DeadLetter">
+            Полная DLQ-запись, связанная с решением; null, если такой связи нет.
+            </param>
+        </member>
+        <member name="M:MonixOne.Inbox.InboxHistoryEntry.#ctor(System.Int64,System.Text.Json.JsonElement,System.Nullable{System.Text.Json.JsonElement},System.Nullable{System.Text.Json.JsonElement})">
+            <summary>
+            Запись истории с долговечными доказательствами соответствующего решения.
+            JSON-значения независимы от DbContext и не требуют Dispose.
+            </summary>
+            <param name="JournalId">
+            Монотонный id записи журнала, используемый для пагинации.
+            Пропуски id после отката транзакций допустимы.
+            </param>
+            <param name="Journal">
+            Решение, время, worker, ссылки на inbox/attempt/DLQ и структурированные детали.
+            </param>
+            <param name="Attempt">
+            Полная зафиксированная попытка с diagnostics, исключением и настройками.
+            Null для решений без бизнес-вызова.
+            </param>
+            <param name="DeadLetter">
+            Полная DLQ-запись, связанная с решением; null, если такой связи нет.
+            </param>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryEntry.JournalId">
+            <summary>
+            Монотонный id записи журнала, используемый для пагинации.
+            Пропуски id после отката транзакций допустимы.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryEntry.Journal">
+            <summary>
+            Решение, время, worker, ссылки на inbox/attempt/DLQ и структурированные детали.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryEntry.Attempt">
+            <summary>
+            Полная зафиксированная попытка с diagnostics, исключением и настройками.
+            Null для решений без бизнес-вызова.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryEntry.DeadLetter">
+            <summary>
+            Полная DLQ-запись, связанная с решением; null, если такой связи нет.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.InboxResultKind">
+            <summary>
+            Решение бизнес-обработчика о завершении текущего номера sequence.
+            </summary>
+        </member>
+        <member name="F:MonixOne.Inbox.InboxResultKind.Applied">
+            <summary>
+            Бизнес-изменения готовы к commit вместе с cursor.
+            </summary>
+        </member>
+        <member name="F:MonixOne.Inbox.InboxResultKind.Ignore">
+            <summary>
+            Закрыть номер без бизнес-изменений.
+            </summary>
+        </member>
+        <member name="F:MonixOne.Inbox.InboxResultKind.Retry">
+            <summary>
+            Откатить бизнес-изменения и отложить новую попытку.
+            </summary>
+        </member>
+        <member name="F:MonixOne.Inbox.InboxResultKind.Reject">
+            <summary>
+            Окончательная ошибка; DLQ и закрытие номера без бизнес-изменений.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.InboxResult">
+            <summary>
+            Неизменяемый результат одной бизнес-попытки и её диагностические данные.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxResult.Kind">
+            <summary>
+            Решение о commit, пропуске, повторе или окончательной ошибке.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxResult.Code">
+            <summary>
+            Непустой машинный код результата для журнала и диагностики.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxResult.Reason">
+            <summary>
+            Причина пропуска, повтора или отклонения; для Applied не нужна.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxResult.RetryAfter">
+            <summary>
+            Явная положительная задержка Retry; null использует автоматическую retry-политику.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxResult.Details">
+            <summary>
+            Структурированная диагностика; копия JSON сохраняется после освобождения исходного документа.
+            Лимит: 64 KiB / глубина 32; превышение заменяется безопасным fallback без изменения Kind.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxResult.Applied">
+            <summary>
+            Успешное применение; пакет фиксирует бизнес-транзакцию и закрывает номер.
+            </summary>
+        </member>
+        <member name="M:MonixOne.Inbox.InboxResult.Ignore(System.String,System.String,System.Nullable{System.Text.Json.JsonElement})">
+            <summary>
+            Пропуск с причиной; бизнес-транзакция откатывается, номер закрывается.
+            </summary>
+        </member>
+        <member name="M:MonixOne.Inbox.InboxResult.Retry(System.String,System.Nullable{System.TimeSpan},System.String,System.Nullable{System.Text.Json.JsonElement})">
+            <summary>
+            Повтор с причиной и необязательной явной задержкой; бизнес-транзакция откатывается.
+            </summary>
+        </member>
+        <member name="M:MonixOne.Inbox.InboxResult.Reject(System.String,System.String,System.Nullable{System.Text.Json.JsonElement})">
+            <summary>
+            Окончательная ошибка с причиной; номер закрывается, поток продолжает работу.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.InboxTelemetry">
+            <summary>
+            Имя Meter для подключения OpenTelemetry или другого System.Diagnostics.Metrics listener.
+            Exporter, endpoint и период экспорта настраиваются приложением.
+            </summary>
+        </member>
+        <member name="F:MonixOne.Inbox.InboxTelemetry.MeterName">
+            <summary>
+            Meter пакета: MonixOne.Inbox.
+            Labels содержат только schema, handler, subscription и ограниченные виды решений.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.OrderedInboxOptions">
+            <summary>
+            Настройки пакета. Nullable-значения означают наследование либо встроенный default.
+            При старте host создаётся неизменяемый снимок; изменения требуют перезапуска.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.OrderedInboxOptions.Schema">
+            <summary>
+            PostgreSQL schema для общих таблиц пакета. По умолчанию ordered_inbox.
+            Не относится к schema бизнес-таблиц приложения.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.OrderedInboxOptions.AutoMigrate">
+            <summary>
+            Устанавливать недостающие миграции при старте host. По умолчанию true.
+            При false схема только проверяется и должна быть установлена заранее.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.OrderedInboxOptions.HistoryCleanup">
+            <summary>Глобальная очистка истории общих таблиц пакета.</summary>
+        </member>
+        <member name="P:MonixOne.Inbox.OrderedInboxOptions.Defaults">
+            <summary>
+            Общие настройки, наследуемые обработчиками.
+            Явные настройки конкретного handler имеют приоритет над Defaults.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.OrderedInboxOptions.Handlers">
+            <summary>
+            Настройки по стабильному handler_id. Каждый handler отдельно хранит cursor и inbox.
+            C#-обработчик для каждого id необходимо зарегистрировать через AddHandler.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.InboxProcessingOptions">
+            <summary>
+            Общие параметры обработки. null наследует значение из предыдущего уровня настройки.
+            Бизнес-параметры применяются dispatcher; приём в БД работает независимо от обработчика.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxProcessingOptions.MaxParallelObjects">
+            <summary>
+            Число объектов, обрабатываемых параллельно одним handler на одной реплике. Default: 4, минимум: 1.
+            Внутри процесса один callback на ключ; между репликами результат согласуется по version.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxProcessingOptions.HandlerTimeout">
+            <summary>
+            Лимит времени одной бизнес-попытки. Default: 30 секунд.
+            Обработчик должен соблюдать переданный CancellationToken; это не таймаут NATS fetch.
+            При игнорировании токена пакет ждёт завершения callback, не запуская параллельный повтор.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxProcessingOptions.PollInterval">
+            <summary>
+            Пауза dispatcher при отсутствии доступной работы. Default: 250 ms.
+            Задержка бизнес-retry задаётся отдельно; NATS intake не использует этот интервал.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxProcessingOptions.StartupReorderWindow">
+            <summary>Окно перестановки первого номера нового ключа. Default: 1 секунда; допускается 0.</summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxProcessingOptions.GapTimeout">
+            <summary>Ожидание отсутствующего следующего номера. Default: 5 секунд; допускается 0.</summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxProcessingOptions.IntakeConcurrency">
+            <summary>Параллельные сохранения на подписку и реплику. Default: 4.</summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxProcessingOptions.Retry">
+            <summary>
+            Повторные бизнес-попытки уже сохранённого inbox.
+            Переподключения инфраструктуры и повторные доставки NATS в этот лимит не входят.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxProcessingOptions.ClassifyException">
+            <summary>
+            Быстрая функция классификации бизнес-исключений; задаётся только кодом.
+            Возвращает Retry либо Reject. Default: null, все бизнес-исключения приводят к Retry.
+            null наследует предыдущее правило. Timeout, отмена host и потеря соединения не классифицируются.
+            Ошибка классификатора или другой результат сохраняются в диагностике с fallback Retry.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.InboxHandlerOptions">
+            <summary>
+            Настройки одного логического handler и его транспортных подписок.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHandlerOptions.Enabled">
+            <summary>
+            Запускать приём и обработку handler. Default: true.
+            При false не нужны активные подписки, бизнес-зависимости и NATS-соединение.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHandlerOptions.Subscriptions">
+            <summary>
+            Подписки по стабильному subscription_id. Нужна хотя бы одна для активного handler.
+            Несколько подписок одного handler используют общий cursor по ключу производителя.
+            </summary>
+        </member>
+        <member name="M:MonixOne.Inbox.InboxHandlerOptions.Subscribe(System.String,System.String,System.String,System.String,System.String)">
+            <summary>
+            Добавляет или обновляет подписку с обязательными транспортными параметрами.
+            Сохраняет ранее настроенный BatchSize и неуказанный ConnectionName.
+            </summary>
+            <param name="subscriptionId">
+            Стабильный id подписки для конфигурации и диагностики.
+            </param>
+            <param name="stream">
+            Имя заранее созданного JetStream stream.
+            </param>
+            <param name="subject">
+            Фильтр NATS subject; разрешены wildcard tokens * и финальный &gt;.
+            </param>
+            <param name="durableName">
+            Общий durable для реплик одного handler; отдельный для другого handler.
+            </param>
+            <param name="connectionName">
+            DI key INatsConnection либо null для default-соединения.
+            </param>
+        </member>
+        <member name="T:MonixOne.Inbox.InboxSubscriptionOptions">
+            <summary>
+            Транспортные параметры одной подписки; null сохраняет унаследованное значение.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxSubscriptionOptions.ConnectionName">
+            <summary>
+            DI key singleton INatsConnection. Без ключа используется default-регистрация.
+            Соединением и его lifetime управляет приложение.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxSubscriptionOptions.Stream">
+            <summary>
+            Имя существующего JetStream stream. Обязательно для активной подписки.
+            Пакет проверяет retention и создаёт только consumer, а не сам stream.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxSubscriptionOptions.Subject">
+            <summary>
+            Фильтр событий подписки. Обязателен; поддерживает * и финальный &gt; по токенам.
+            Все номера исходной sequence должны попадать в подписки соответствующего handler.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxSubscriptionOptions.DurableName">
+            <summary>
+            Имя durable pull consumer. Обязательно; сохраняется между рестартами и репликами.
+            Разные handlers одного subject используют разные durables.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxSubscriptionOptions.BatchSize">
+            <summary>
+            Максимальное число сообщений одного fetch. Default: 32, минимум: 1.
+            Следующий batch запрашивается после сохранения текущего; это не бизнес-параллельность.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.InboxRetryOptions">
+            <summary>
+            Настройки бизнес-retry; null наследует значение из defaults или handler.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxRetryOptions.MaxAttempts">
+            <summary>
+            Максимум бизнес-попыток, включая первую. Default: 5, минимум: 1.
+            Ожидание sequence и инфраструктурные переподключения попытками не считаются.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxRetryOptions.InitialDelay">
+            <summary>
+            Начальная задержка автоматического бизнес-retry. Default: 1 секунда.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxRetryOptions.MaxDelay">
+            <summary>
+            Верхняя граница растущей задержки retry. Default: 1 минута.
+            Должна быть не меньше InitialDelay. Явный retryAfter ограничен диапазоном 1 мс — MaxDelay.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.InboxHistoryCleanupOptions">
+            <summary>Пакетная очистка терминальной истории. Cursor сохраняется без TTL.</summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryCleanupOptions.Enabled">
+            <summary>Запускать фоновую очистку. Default: true.</summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryCleanupOptions.CompletedRetention">
+            <summary>Хранить processed/skipped. Default: 30 дней.</summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryCleanupOptions.DeadLetterRetention">
+            <summary>Хранить DLQ и необходимую исходную историю. Default: 90 дней.</summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryCleanupOptions.Interval">
+            <summary>Период очистки. Default: 1 час.</summary>
+        </member>
+        <member name="P:MonixOne.Inbox.InboxHistoryCleanupOptions.BatchSize">
+            <summary>Максимум событий или DLQ в одной короткой транзакции. Default: 500.</summary>
+        </member>
+        <member name="T:MonixOne.Inbox.Registration.InboxRegistration`1">
+            <summary>
+            Настройки, собранные всеми модулями до старта host.
+            Catalog применяет их по приоритетам и создаёт единый неизменяемый снимок.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxRegistration`1.Configurations">
+            <summary>
+            Секции внешней конфигурации в порядке регистрации; привязка выполняется при старте.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxRegistration`1.Configure">
+            <summary>
+            Явные общие C# overrides, применяемые после внешней конфигурации.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxRegistration`1.Handlers">
+            <summary>
+            Стабильные handler ids, бизнес-фабрики и локальные C# настройки.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxRegistration`1.Subscriptions">
+            <summary>
+            Дополнительные транспортные overrides по handler_id/subscription_id.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.Registration.HandlerDescriptor`1">
+            <summary>
+            Регистрация C# handler до объединения с настройками конфигурации.
+            </summary>
+            <param name="Id">
+            Стабильный id логического потребителя, общий для всех его реплик.
+            </param>
+            <param name="HandlerType">
+            Тип обработчика.
+            </param>
+            <param name="Resolve">
+            Разрешает бизнес-зависимости из scope текущей попытки, не из singleton worker.
+            </param>
+            <param name="Configure">
+            Локальные C# overrides поверх общих и handler-настроек из конфигурации.
+            </param>
+        </member>
+        <member name="M:MonixOne.Inbox.Registration.HandlerDescriptor`1.#ctor(System.String,System.Type,System.Func{System.IServiceProvider,MonixOne.Inbox.IInboxHandler{`0}},System.Action{MonixOne.Inbox.InboxHandlerOptions})">
+            <summary>
+            Регистрация C# handler до объединения с настройками конфигурации.
+            </summary>
+            <param name="Id">
+            Стабильный id логического потребителя, общий для всех его реплик.
+            </param>
+            <param name="HandlerType">
+            Тип обработчика.
+            </param>
+            <param name="Resolve">
+            Разрешает бизнес-зависимости из scope текущей попытки, не из singleton worker.
+            </param>
+            <param name="Configure">
+            Локальные C# overrides поверх общих и handler-настроек из конфигурации.
+            </param>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.HandlerDescriptor`1.Id">
+            <summary>
+            Стабильный id логического потребителя, общий для всех его реплик.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.HandlerDescriptor`1.HandlerType">
+            <summary>
+            Тип обработчика.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.HandlerDescriptor`1.Resolve">
+            <summary>
+            Разрешает бизнес-зависимости из scope текущей попытки, не из singleton worker.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.HandlerDescriptor`1.Configure">
+            <summary>
+            Локальные C# overrides поверх общих и handler-настроек из конфигурации.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.Registration.SubscriptionDescriptor">
+            <summary>
+            Транспортные overrides, добавляемые отдельным модулем через AddSubscription.
+            </summary>
+            <param name="HandlerId">
+            Id зарегистрированного handler; порядок регистрации модулей не важен.
+            </param>
+            <param name="Id">
+            Id подписки, по которому объединяются частичные настройки.
+            </param>
+            <param name="Configure">
+            Последний уровень транспортных overrides; бизнес-параметры не меняет.
+            </param>
+        </member>
+        <member name="M:MonixOne.Inbox.Registration.SubscriptionDescriptor.#ctor(System.String,System.String,System.Action{MonixOne.Inbox.InboxSubscriptionOptions})">
+            <summary>
+            Транспортные overrides, добавляемые отдельным модулем через AddSubscription.
+            </summary>
+            <param name="HandlerId">
+            Id зарегистрированного handler; порядок регистрации модулей не важен.
+            </param>
+            <param name="Id">
+            Id подписки, по которому объединяются частичные настройки.
+            </param>
+            <param name="Configure">
+            Последний уровень транспортных overrides; бизнес-параметры не меняет.
+            </param>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.SubscriptionDescriptor.HandlerId">
+            <summary>
+            Id зарегистрированного handler; порядок регистрации модулей не важен.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.SubscriptionDescriptor.Id">
+            <summary>
+            Id подписки, по которому объединяются частичные настройки.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.SubscriptionDescriptor.Configure">
+            <summary>
+            Последний уровень транспортных overrides; бизнес-параметры не меняет.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.Registration.InboxSubscriptionSettings">
+            <summary>
+            Эффективные транспортные параметры подписки; бизнес-настройки принадлежат handler.
+            </summary>
+            <param name="Id">
+            Стабильный subscription_id для конфигурации и диагностики, не часть sequence key.
+            </param>
+            <param name="ConnectionName">
+            DI key singleton INatsConnection либо null для default-соединения.
+            </param>
+            <param name="Stream">
+            Существующий JetStream stream с совместимой retention policy.
+            </param>
+            <param name="Subject">
+            Фильтр NATS subject; все номера исходного счётчика должны поступать handler.
+            </param>
+            <param name="DurableName">
+            Общий durable реплик данной подписки; другой handler имеет отдельный durable.
+            </param>
+            <param name="BatchSize">
+            Верхняя граница сообщений одного fetch; default: 32.
+            </param>
+        </member>
+        <member name="M:MonixOne.Inbox.Registration.InboxSubscriptionSettings.#ctor(System.String,System.String,System.String,System.String,System.String,System.Int32)">
+            <summary>
+            Эффективные транспортные параметры подписки; бизнес-настройки принадлежат handler.
+            </summary>
+            <param name="Id">
+            Стабильный subscription_id для конфигурации и диагностики, не часть sequence key.
+            </param>
+            <param name="ConnectionName">
+            DI key singleton INatsConnection либо null для default-соединения.
+            </param>
+            <param name="Stream">
+            Существующий JetStream stream с совместимой retention policy.
+            </param>
+            <param name="Subject">
+            Фильтр NATS subject; все номера исходного счётчика должны поступать handler.
+            </param>
+            <param name="DurableName">
+            Общий durable реплик данной подписки; другой handler имеет отдельный durable.
+            </param>
+            <param name="BatchSize">
+            Верхняя граница сообщений одного fetch; default: 32.
+            </param>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxSubscriptionSettings.Id">
+            <summary>
+            Стабильный subscription_id для конфигурации и диагностики, не часть sequence key.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxSubscriptionSettings.ConnectionName">
+            <summary>
+            DI key singleton INatsConnection либо null для default-соединения.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxSubscriptionSettings.Stream">
+            <summary>
+            Существующий JetStream stream с совместимой retention policy.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxSubscriptionSettings.Subject">
+            <summary>
+            Фильтр NATS subject; все номера исходного счётчика должны поступать handler.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxSubscriptionSettings.DurableName">
+            <summary>
+            Общий durable реплик данной подписки; другой handler имеет отдельный durable.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxSubscriptionSettings.BatchSize">
+            <summary>
+            Верхняя граница сообщений одного fetch; default: 32.
+            </summary>
+        </member>
+        <member name="M:MonixOne.Inbox.Registration.InboxSubscriptionSettings.Apply(MonixOne.Inbox.InboxSubscriptionOptions)">
+            <summary>
+            Накладывает транспортные overrides по id без сброса неуказанных параметров.
+            </summary>
+        </member>
+        <member name="T:MonixOne.Inbox.Registration.InboxHandlerRegistration`1">
+            <summary>
+            Готовая регистрация handler; зависимости разрешаются только внутри операции.
+            </summary>
+            <param name="Id">
+            Стабильный handler_id, разделяющий inbox и cursor логических потребителей.
+            </param>
+            <param name="HandlerType">
+            Тип бизнес-обработчика для DI и диагностики.
+            </param>
+            <param name="Resolve">
+            Фабрика обработчика из scope текущей бизнес-попытки.
+            </param>
+            <param name="Enabled">
+            Запускать handler; при false транспортные и бизнес-зависимости не создаются.
+            </param>
+            <param name="Processing">
+            Неизменяемые эффективные параметры обработки и envelope.
+            </param>
+            <param name="Subscriptions">
+            Проверенные подписки одного handler с общими ключами последовательности.
+            </param>
+        </member>
+        <member name="M:MonixOne.Inbox.Registration.InboxHandlerRegistration`1.#ctor(System.String,System.Type,System.Func{System.IServiceProvider,MonixOne.Inbox.IInboxHandler{`0}},System.Boolean,MonixOne.Inbox.Registration.InboxProcessingSettings,System.Collections.Immutable.ImmutableArray{MonixOne.Inbox.Registration.InboxSubscriptionSettings})">
+            <summary>
+            Готовая регистрация handler; зависимости разрешаются только внутри операции.
+            </summary>
+            <param name="Id">
+            Стабильный handler_id, разделяющий inbox и cursor логических потребителей.
+            </param>
+            <param name="HandlerType">
+            Тип бизнес-обработчика для DI и диагностики.
+            </param>
+            <param name="Resolve">
+            Фабрика обработчика из scope текущей бизнес-попытки.
+            </param>
+            <param name="Enabled">
+            Запускать handler; при false транспортные и бизнес-зависимости не создаются.
+            </param>
+            <param name="Processing">
+            Неизменяемые эффективные параметры обработки и envelope.
+            </param>
+            <param name="Subscriptions">
+            Проверенные подписки одного handler с общими ключами последовательности.
+            </param>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxHandlerRegistration`1.Id">
+            <summary>
+            Стабильный handler_id, разделяющий inbox и cursor логических потребителей.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxHandlerRegistration`1.HandlerType">
+            <summary>
+            Тип бизнес-обработчика для DI и диагностики.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxHandlerRegistration`1.Resolve">
+            <summary>
+            Фабрика обработчика из scope текущей бизнес-попытки.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxHandlerRegistration`1.Enabled">
+            <summary>
+            Запускать handler; при false транспортные и бизнес-зависимости не создаются.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxHandlerRegistration`1.Processing">
+            <summary>
+            Неизменяемые эффективные параметры обработки и envelope.
+            </summary>
+        </member>
+        <member name="P:MonixOne.Inbox.Registration.InboxHandlerRegistration`1.Subscriptions">
+            <summary>
+            Проверенные подписки одного handler с общими ключами последовательности.
+            </summary>
+        </member>
+    </members>
+</doc>
