@@ -14,7 +14,10 @@
     <configurations />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ea06ce7c-9742-462a-a961-f361ad21ab68" name="Changes" comment="fix: restore" />
+    <list default="true" id="ea06ce7c-9742-462a-a961-f361ad21ab68" name="Changes" comment="fix: restore">
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.MonixOne.Inbox/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.MonixOne.Inbox/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -23,7 +26,7 @@
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="dev" />
+        <entry key="$PROJECT_DIR$" value="main" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -94,8 +97,10 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "Git.Working.Tree.Tab.closed.by.user": "closed",
     "SONARLINT_PRECOMMIT_ANALYSIS": "true",
-    "git-widget-placeholder": "restore"
+    "git-widget-placeholder": "main",
+    "git.auto.fetch.suggestion.counter": "1"
   }
 }]]></component>
   <component name="TaskManager">
@@ -103,6 +108,17 @@
   </component>
   <component name="UnityCheckinConfiguration" checkUnsavedScenes="false" />
   <component name="UnityProjectConfiguration" hasMinimizedUI="false" />
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="fix: restore" />
     <option name="LAST_COMMIT_MESSAGE" value="fix: restore" />
