@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Ordered inbox for EF Core, PostgreSQL and NATS JetStream.</Description>
+    <Version>0.1.0-alpha.1</Version>
+    <IsPackable>true</IsPackable>
+    <PackageId>MonixOne.Inbox</PackageId>
+    <Authors>MonixOne</Authors>
+    <PackageTags>inbox;PostgreSQL;NATS;EFCore;ordered</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="linq2db.EntityFrameworkCore" />
+    <PackageReference Include="linq2db" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="NATS.Client.JetStream" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="MonixOne.Inbox.Tests" />
+    <EmbeddedResource Include="Migrations/*.sql" />
+    <Content Include="Migrations/*.sql" Pack="true" PackagePath="tools/migrations" />
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>
