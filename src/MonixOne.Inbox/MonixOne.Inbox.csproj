@@ -1,11 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Description>Ordered inbox for EF Core, PostgreSQL and NATS JetStream.</Description>
-    <Version>1.1.0</Version>
+    <Title>MonixOne.Inbox</Title>
+    <Description>Ordered inbox for .NET 10, EF Core, PostgreSQL and NATS JetStream with transactional handlers, per-key ordering, deduplication, retries and dead-letter storage.</Description>
+    <Version>1.1.1</Version>
     <IsPackable>true</IsPackable>
     <PackageId>MonixOne.Inbox</PackageId>
-    <Authors>MonixOne</Authors>
-    <PackageTags>inbox;PostgreSQL;NATS;EFCore;ordered</PackageTags>
+    <Authors>Shulyakovsky.E</Authors>
+    <Copyright>Copyright (c) 2026 Shulyakovskiy Evgeniy</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Shulyakovskiy/MonixOne.Inbox</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Shulyakovskiy/MonixOne.Inbox</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageTags>dotnet;inbox;PostgreSQL;NATS;JetStream;EFCore;ordered;idempotency;retry;DLQ</PackageTags>
+    <PackageReleaseNotes>Add the package icon, MIT license metadata, project and source repository links.</PackageReleaseNotes>
+    <PackageIcon>nuget-icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <_InboxPackageReadmePath>$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/nuget/README.md</_InboxPackageReadmePath>
     <IncludeSymbols>true</IncludeSymbols>
@@ -27,6 +36,8 @@
     <EmbeddedResource Include="Migrations/*.sql" />
     <Content Include="Migrations/*.sql" Pack="true" PackagePath="tools/migrations" />
     <None Include="../../README.md" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="../../assets/nuget-icon.png" Link="nuget-icon.png" Pack="true" PackagePath="/" />
     <None Include="$(_InboxPackageReadmePath)" Pack="true" PackagePath="/" Visible="false" />
     <None Include="../../docs/event-processing.png" Pack="true" PackagePath="docs/" />
     <None Include="../../docs/event-processing.svg" Pack="true" PackagePath="docs/" />

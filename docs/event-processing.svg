@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1840" viewBox="0 0 1280 1840"
   role="img" aria-labelledby="title description">
-  <title id="title">MonixOne.Inbox 1.1.0 — обработка события и ключевые правила</title>
+  <title id="title">MonixOne.Inbox 1.1.1 — обработка события и ключевые правила</title>
   <desc id="description">Два независимых этапа. Intake сохраняет новый факт, дубликат или DLQ
   и отправляет DoubleAck после COMMIT. Dispatcher выбирает голову последовательности,
   вызывает handler и через CAS атомарно фиксирует бизнес-изменения, inbox и курсор.
@@ -25,7 +25,7 @@
 
 <text x="32" y="58" font-size="37" font-weight="700" text-anchor="start">Событие: от доставки до результата</text>
 <rect x="1104" y="27" width="144" height="44" rx="22" fill="#0f172a" stroke="#0f172a" stroke-width="1.5"/>
-<text x="1176" y="56" font-size="22" font-weight="700" text-anchor="middle" fill="#ffffff" style="fill:#ffffff">v1.1.0</text>
+<text x="1176" y="56" font-size="22" font-weight="700" text-anchor="middle" fill="#ffffff" style="fill:#ffffff">v1.1.1</text>
 <text x="32" y="97" font-size="23" font-weight="400" text-anchor="start" fill="#475569" style="fill:#475569">Сохранение и бизнес-обработка — два независимых этапа.</text>
 <rect x="32" y="124" width="14" height="14" rx="4" fill="#2563eb" stroke="#2563eb" stroke-width="1.5"/>
 <text x="57" y="138" font-size="19" font-weight="400" text-anchor="start" fill="#475569" style="fill:#475569">Приём и хранение</text>
@@ -177,5 +177,5 @@
 <text x="718" y="1665" font-size="22" font-weight="700" text-anchor="start">Очистка сохраняет активные данные</text>
 <text x="670" y="1702" font-size="18" font-weight="400" text-anchor="start" fill="#475569" style="fill:#475569">HistoryCleanup удаляет терминальную историю по retention.</text>
 <text x="670" y="1730" font-size="18" font-weight="400" text-anchor="start" fill="#475569" style="fill:#475569">Pending / retry сохраняются; курсоры не имеют TTL.</text>
-<text x="32" y="1809" font-size="18" font-weight="400" text-anchor="start" fill="#64748b" style="fill:#64748b">MonixOne.Inbox · PostgreSQL + NATS JetStream · стабильная версия 1.1.0</text>
+<text x="32" y="1809" font-size="18" font-weight="400" text-anchor="start" fill="#64748b" style="fill:#64748b">MonixOne.Inbox · PostgreSQL + NATS JetStream · стабильная версия 1.1.1</text>
 </svg>
