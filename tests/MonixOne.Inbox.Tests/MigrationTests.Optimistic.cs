@@ -80,7 +80,7 @@ public sealed partial class MigrationTests
                 .ProcessOneAsync(handler, "new worker", Token));
         Assert.Equal(160, await ScalarAsync<long>($"SELECT last_sequence FROM \"{_schema}\".consumer_state WHERE object_key = 'initialized'"));
         Assert.Equal(1, await ScalarAsync<long>($"SELECT count(*) FROM \"{_schema}\".inbox_journal WHERE decision = 'terminal_policy_transition'"));
-        Assert.Equal(1, await ScalarAsync<long>($"SELECT count(*) FROM \"{_schema}\".inbox_journal WHERE decision = 'gap_skipped' AND details ->> 'first_missing' = '159'"));
+        Assert.Equal(1, await ScalarAsync<long>($"SELECT count(*) FROM \"{_schema}\".inbox_journal WHERE decision = 'gap_skipped' AND details ->> 'firstMissing' = '159'"));
         Assert.Equal(1, await ScalarAsync<long>($"SELECT count(*) FROM \"{_schema}\".inbox_dlq"));
     }
 

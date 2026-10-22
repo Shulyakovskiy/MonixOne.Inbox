@@ -187,7 +187,7 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
     {
         _probe.Handle = (_, message, _) =>
             Task.FromResult(
-                message.GetProperty("object_key").GetString() == "other"
+                message.GetProperty("objectKey").GetString() == "other"
                 || message.GetProperty("sequence").GetInt64() == 2
                     ? InboxResult.Applied
                     : InboxResult.Retry("Dependency missing", TimeSpan.FromMilliseconds(1), "dependency")
@@ -530,7 +530,7 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
                 $"SELECT count(*) FROM \"{_schema}\".inbox_attempts a "
                     + $"JOIN \"{_schema}\".inbox i ON i.id = a.inbox_id "
                     + "WHERE jsonb_array_length(a.diagnostics) = 1 "
-                    + "AND a.diagnostics -> 0 -> 'details' ->> 'object_key' = i.object_key"
+                    + "AND a.diagnostics -> 0 -> 'details' ->> 'objectKey' = i.object_key"
             )
         );
         var records = logs.Records.Where(x => x.Category == typeof(InboxDiagnostics).FullName).ToArray();
@@ -822,13 +822,13 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         JsonSerializer.SerializeToUtf8Bytes(
             new
             {
-                event_id = $"object:created:{key}:{sequence}",
+                eventId = $"object:created:{key}:{sequence}",
                 producer = "service",
-                sequence_scope = "objects",
-                object_key = key,
+                sequenceScope = "objects",
+                objectKey = key,
                 sequence,
-                event_type = "object.created",
-                occurred_at = "2026-10-08T01:00:00Z",
+                eventType = "object.created",
+                occurredAt = "2026-10-08T01:00:00Z",
                 payload = new { value = 42 },
             }
         );
@@ -898,7 +898,7 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
             await probe.Diagnose(diagnostics, message, ct);
             Assert.NotNull(db.Database.CurrentTransaction);
             Assert.Equal(42, message.GetProperty("payload").GetProperty("value").GetInt32());
-            var key = message.GetProperty("object_key").GetString()!;
+            var key = message.GetProperty("objectKey").GetString()!;
             var sequence = message.GetProperty("sequence").GetInt64();
             probe.Calls.Enqueue((handler, key, sequence));
             db.Add(

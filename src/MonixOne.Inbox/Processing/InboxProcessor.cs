@@ -27,7 +27,11 @@ internal sealed class InboxProcessor<TDbContext>(
 )
     where TDbContext : DbContext
 {
-    private static readonly JsonSerializerOptions _jsonOptions = new() { MaxDepth = 128 };
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        MaxDepth = 128,
+    };
 
     private static readonly string _version = typeof(InboxResult)
         .Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
@@ -79,7 +83,7 @@ internal sealed class InboxProcessor<TDbContext>(
                         row.CompletedAt = DateTimeOffset.UtcNow;
                         await WriteInboxAsync(data, row, cancellation);
                         await JournalAsync(data, row, worker, "terminal_policy_transition", null, null,
-                            new { last_sequence = row.Sequence }, cancellation);
+                            new { lastSequence = row.Sequence }, cancellation);
                         await CloseRangeAsync(data, state, row, worker, candidate.FirstReceivedAt, cancellation);
                     }
                     else
@@ -206,14 +210,14 @@ internal sealed class InboxProcessor<TDbContext>(
     {
         if (state.LastSequence is null)
             await JournalAsync(data, row, worker, "initial_sequence_selected", null, null,
-                new { previous_cursor = (long?)null, selected_sequence = row.Sequence }, token);
+                new { previousCursor = (long?)null, selectedSequence = row.Sequence }, token);
         else if (row.Sequence - 1 > state.LastSequence)
         {
             _gapClosed = true;
             await JournalAsync(data, row, worker, "gap_skipped", null, null,
-                new { previous_cursor = state.LastSequence, first_missing = state.LastSequence + 1,
-                    last_missing = row.Sequence - 1, selected_sequence = row.Sequence,
-                    waited_ms = Math.Max(0, (DateTimeOffset.UtcNow - firstReceivedAt).TotalMilliseconds) }, token);
+                new { previousCursor = state.LastSequence, firstMissing = state.LastSequence + 1,
+                    lastMissing = row.Sequence - 1, selectedSequence = row.Sequence,
+                    waitedMs = Math.Max(0, (DateTimeOffset.UtcNow - firstReceivedAt).TotalMilliseconds) }, token);
         }
         state.LastSequence = row.Sequence;
         state.Version++;
@@ -263,7 +267,7 @@ internal sealed class InboxProcessor<TDbContext>(
             "stale_sequence",
             null,
             null,
-            new { last_sequence = state.LastSequence, actual_sequence = row.Sequence },
+            new { lastSequence = state.LastSequence, actualSequence = row.Sequence },
             token
         );
     }
@@ -535,9 +539,9 @@ internal sealed class InboxProcessor<TDbContext>(
             {
                 row.Code,
                 row.Reason,
-                next_attempt_at = row.NextAttemptAt,
-                last_sequence = state.LastSequence,
-                cursor_advanced = advance,
+                nextAttemptAt = row.NextAttemptAt,
+                lastSequence = state.LastSequence,
+                cursorAdvanced = advance,
             },
             token
         );

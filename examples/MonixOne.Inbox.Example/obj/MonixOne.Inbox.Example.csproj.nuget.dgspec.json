@@ -383,7 +383,7 @@
       }
     },
     "/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/MonixOne.Inbox.csproj": {
-      "version": "0.1.0-alpha.1",
+      "version": "1.1.1",
       "restore": {
         "projectUniqueName": "/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/src/MonixOne.Inbox/MonixOne.Inbox.csproj",
         "projectName": "MonixOne.Inbox",

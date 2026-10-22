@@ -22,7 +22,7 @@ public sealed class InboxAdministration<TDbContext>
 {
     private static readonly JsonSerializerOptions _json = new()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         MaxDepth = 256,
     };
     private readonly TDbContext _context;

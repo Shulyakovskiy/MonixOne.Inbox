@@ -12,6 +12,53 @@ namespace MonixOne.Inbox.Tests;
 public sealed partial class ProcessingTests
 {
     [Fact]
+    public async Task Serialized_history_uses_camel_case_and_preserves_custom_json_and_headers()
+    {
+        _probe.Diagnose = (diagnostics, _, _) =>
+        {
+            using var details = JsonDocument.Parse("""{"profile_id":42}""");
+            diagnostics.Write("profile.checked", "Profile checked.", details.RootElement);
+            return Task.CompletedTask;
+        };
+        _probe.Handle = (_, _, _) =>
+        {
+            using var details = JsonDocument.Parse("""{"profile_id":42}""");
+            return Task.FromResult(InboxResult.Reject("Unsupported profile.", details: details.RootElement));
+        };
+        var host = HostFor();
+        await SeedAsync(host, 1);
+        Assert.True(await ProcessAsync(host));
+        var id = await ScalarAsync<Guid>($"SELECT id FROM \"{_schema}\".inbox_dlq");
+
+        var page = (await HistoryAsync(host, id))!;
+        var json = JsonSerializer.SerializeToElement(page);
+
+        Assert.Equal(new[] { "inbox", "consumerState", "deadLetter", "entries", "nextJournalId" },
+            json.EnumerateObject().Select(x => x.Name));
+        Assert.Equal("object:created:object-1:1", json.GetProperty("inbox").GetProperty("eventId").GetString());
+        Assert.Equal(Event(1), json.GetProperty("inbox").GetProperty("rawPayload").GetBytesFromBase64());
+        Assert.Equal("correlation-1", json.GetProperty("inbox").GetProperty("source")
+            .GetProperty("headers").GetProperty("x-correlation-id")[0].GetString());
+        Assert.Equal(1, json.GetProperty("consumerState").GetProperty("lastSequence").GetInt64());
+        Assert.Equal(id, json.GetProperty("deadLetter").GetProperty("id").GetGuid());
+        var entry = Assert.Single(json.GetProperty("entries").EnumerateArray(), x =>
+            x.GetProperty("attempt").ValueKind == JsonValueKind.Object);
+        Assert.Equal(new[] { "journalId", "journal", "attempt", "deadLetter" },
+            entry.EnumerateObject().Select(x => x.Name));
+        Assert.Equal("rejected", entry.GetProperty("attempt").GetProperty("outcome").GetString());
+        Assert.Equal(42, entry.GetProperty("attempt").GetProperty("details").GetProperty("profile_id").GetInt32());
+        Assert.Equal(42, entry.GetProperty("attempt").GetProperty("diagnostics")[0]
+            .GetProperty("details").GetProperty("profile_id").GetInt32());
+        Assert.Equal("rejected", entry.GetProperty("journal").GetProperty("details").GetProperty("code").GetString());
+        Assert.True(entry.GetProperty("journal").GetProperty("details").GetProperty("cursorAdvanced").GetBoolean());
+        Assert.Equal(id, entry.GetProperty("deadLetter").GetProperty("id").GetGuid());
+        var restored = JsonSerializer.Deserialize<InboxHistoryPage>(JsonSerializer.Serialize(page))!;
+        Assert.Equal(page.Entries.Select(x => x.JournalId), restored.Entries.Select(x => x.JournalId));
+        Assert.Equal(page.DeadLetter!.Value.GetProperty("id").GetGuid(),
+            restored.DeadLetter!.Value.GetProperty("id").GetGuid());
+    }
+
+    [Fact]
     public async Task Invalid_dlq_history_has_raw_bytes_and_receipts_without_inbox_or_unrelated_null_links()
     {
         var host = HostFor();
@@ -22,7 +69,7 @@ public sealed partial class ProcessingTests
         var page = (await HistoryAsync(host, first.DlqId!.Value, pageSize: 1))!;
         Assert.Null(page.Inbox);
         Assert.Null(page.ConsumerState);
-        Assert.Equal(invalid, Convert.FromBase64String(page.DeadLetter!.Value.GetProperty("raw_payload").GetString()!));
+        Assert.Equal(invalid, Convert.FromBase64String(page.DeadLetter!.Value.GetProperty("rawPayload").GetString()!));
         Assert.Single(page.Entries);
         Assert.Null(page.Entries[0].Attempt);
         Assert.NotNull(page.NextJournalId);
@@ -55,8 +102,8 @@ public sealed partial class ProcessingTests
         {
             var page = (await api.ReadHistoryAsync(id, cursor.Value, 2, Token))!;
             Assert.Equal(id, page.Inbox!.Value.GetProperty("id").GetGuid());
-            Assert.Equal("object-1", page.ConsumerState!.Value.GetProperty("object_key").GetString());
-            Assert.All(page.Entries, entry => Assert.Equal(id, entry.Journal.GetProperty("inbox_id").GetGuid()));
+            Assert.Equal("object-1", page.ConsumerState!.Value.GetProperty("objectKey").GetString());
+            Assert.All(page.Entries, entry => Assert.Equal(id, entry.Journal.GetProperty("inboxId").GetGuid()));
             journals.AddRange(page.Entries.Select(x => x.JournalId));
             cursor = page.NextJournalId;
         } while (cursor is not null);

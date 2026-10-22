@@ -854,7 +854,7 @@
           }
         }
       },
-      "MonixOne.Inbox/0.1.0-alpha.1": {
+      "MonixOne.Inbox/1.1.1": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v10.0",
         "dependencies": {
@@ -2096,7 +2096,7 @@
         "useSharedDesignerContext.txt"
       ]
     },
-    "MonixOne.Inbox/0.1.0-alpha.1": {
+    "MonixOne.Inbox/1.1.1": {
       "type": "project",
       "path": "../../src/MonixOne.Inbox/MonixOne.Inbox.csproj",
       "msbuildProject": "../../src/MonixOne.Inbox/MonixOne.Inbox.csproj"
@@ -2106,7 +2106,7 @@
     "net10.0": [
       "JetBrains.Annotations >= 2026.2.0",
       "Microsoft.Extensions.Hosting >= 10.0.12",
-      "MonixOne.Inbox >= 0.1.0-alpha.1"
+      "MonixOne.Inbox >= 1.1.1"
     ]
   },
   "packageFolders": {

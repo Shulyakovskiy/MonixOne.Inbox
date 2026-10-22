@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "wRT3rdRm1JU=",
+  "dgSpecHash": "EwNFqnHQBpw=",
   "success": true,
   "projectFilePath": "/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/examples/MonixOne.Inbox.Example/MonixOne.Inbox.Example.csproj",
   "expectedPackageFiles": [
@@ -47,7 +47,8 @@
     "/Users/sea/.nuget/packages/nats.nkeys/1.0.1/nats.nkeys.1.0.1.nupkg.sha512",
     "/Users/sea/.nuget/packages/npgsql/10.0.3/npgsql.10.0.3.nupkg.sha512",
     "/Users/sea/.nuget/packages/npgsql.entityframeworkcore.postgresql/10.0.3/npgsql.entityframeworkcore.postgresql.10.0.3.nupkg.sha512",
-    "/Users/sea/.nuget/packages/system.diagnostics.eventlog/10.0.12/system.diagnostics.eventlog.10.0.12.nupkg.sha512"
+    "/Users/sea/.nuget/packages/system.diagnostics.eventlog/10.0.12/system.diagnostics.eventlog.10.0.12.nupkg.sha512",
+    "/Users/sea/.nuget/packages/monixone.inbox/1.1.1/monixone.inbox.1.1.1.nupkg.sha512"
   ],
   "logs": []
 }

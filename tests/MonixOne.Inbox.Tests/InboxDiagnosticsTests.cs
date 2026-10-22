@@ -49,7 +49,7 @@ public sealed class InboxDiagnosticsTests
         var entries = snapshot.RootElement.EnumerateArray().ToArray();
         Assert.InRange(entries.Length, 2, InboxDiagnostics.MaxEntries);
         Assert.Equal("diagnostics.truncated", entries[^1].GetProperty("code").GetString());
-        Assert.Equal(500L, entries.Length - 1 + entries[^1].GetProperty("dropped_entries").GetInt64());
+        Assert.Equal(500L, entries.Length - 1 + entries[^1].GetProperty("droppedEntries").GetInt64());
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class InboxDiagnosticsTests
         using var snapshot = JsonDocument.Parse(diagnostics.Complete());
         var entry = Assert.Single(snapshot.RootElement.EnumerateArray());
         Assert.Equal("diagnostics.truncated", entry.GetProperty("code").GetString());
-        Assert.Equal(1, entry.GetProperty("dropped_entries").GetInt32());
+        Assert.Equal(1, entry.GetProperty("droppedEntries").GetInt32());
     }
 
     [Fact]

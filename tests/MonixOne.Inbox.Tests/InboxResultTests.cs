@@ -5,6 +5,21 @@ namespace MonixOne.Inbox.Tests;
 public sealed class InboxResultTests
 {
     [Fact]
+    public void Result_serialization_uses_camel_case_and_preserves_custom_details()
+    {
+        using var details = JsonDocument.Parse("""{"profile_id":42}""");
+        var delay = TimeSpan.FromSeconds(5);
+        var result = InboxResult.Retry("Profile is not ready.", delay, details: details.RootElement);
+
+        var json = JsonSerializer.SerializeToElement(result);
+
+        Assert.Equal(new[] { "kind", "code", "reason", "retryAfter", "details" },
+            json.EnumerateObject().Select(x => x.Name));
+        Assert.Equal(delay, json.GetProperty("retryAfter").Deserialize<TimeSpan>());
+        Assert.Equal(42, json.GetProperty("details").GetProperty("profile_id").GetInt32());
+    }
+
+    [Fact]
     public void Diagnostic_json_survives_the_callers_document_disposal()
     {
         InboxResult result;

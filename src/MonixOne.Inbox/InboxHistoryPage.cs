@@ -1,13 +1,14 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MonixOne.Inbox;
 
 /// <summary>
 /// Согласованный снимок события и страница его долговечной истории.
-/// JSON содержит имена полей в snake_case; raw_payload представлен в Base64.
+/// JSON содержит имена полей в camelCase; rawPayload представлен в Base64.
 /// </summary>
 /// <param name="Inbox">
-/// Исходное событие и текущий статус, включая run_id и бюджет попыток.
+/// Исходное событие и текущий статус, включая runId и бюджет попыток.
 /// Null для некорректного сообщения, которое не попало в inbox.
 /// </param>
 /// <param name="ConsumerState">
@@ -16,22 +17,22 @@ namespace MonixOne.Inbox;
 /// </param>
 /// <param name="DeadLetter">
 /// Выбранная DLQ-запись при чтении по её id.
-/// При чтении по inbox_id DLQ-записи доступны через Entries.
+/// При чтении по inboxId DLQ-записи доступны через Entries.
 /// </param>
 /// <param name="Entries">
 /// Записи журнала по возрастанию id с полными связанными попытками и DLQ.
-/// История включает все run_id, а не только текущий прогон.
+/// История включает все runId, а не только текущий прогон.
 /// </param>
 /// <param name="NextJournalId">
 /// Последний возвращённый id для следующей страницы.
 /// Null, если в текущем снимке больше записей нет.
 /// </param>
 public sealed record InboxHistoryPage(
-    JsonElement? Inbox,
-    JsonElement? ConsumerState,
-    JsonElement? DeadLetter,
-    IReadOnlyList<InboxHistoryEntry> Entries,
-    long? NextJournalId
+    [property: JsonPropertyName("inbox")] JsonElement? Inbox,
+    [property: JsonPropertyName("consumerState")] JsonElement? ConsumerState,
+    [property: JsonPropertyName("deadLetter")] JsonElement? DeadLetter,
+    [property: JsonPropertyName("entries")] IReadOnlyList<InboxHistoryEntry> Entries,
+    [property: JsonPropertyName("nextJournalId")] long? NextJournalId
 );
 
 /// <summary>
@@ -53,9 +54,9 @@ public sealed record InboxHistoryPage(
 /// Полная DLQ-запись, связанная с решением; null, если такой связи нет.
 /// </param>
 public sealed record InboxHistoryEntry(
-    long JournalId,
-    JsonElement Journal,
-    JsonElement? Attempt,
-    JsonElement? DeadLetter
+    [property: JsonPropertyName("journalId")] long JournalId,
+    [property: JsonPropertyName("journal")] JsonElement Journal,
+    [property: JsonPropertyName("attempt")] JsonElement? Attempt,
+    [property: JsonPropertyName("deadLetter")] JsonElement? DeadLetter
 );
 

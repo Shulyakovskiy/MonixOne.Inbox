@@ -138,7 +138,7 @@ public sealed class InboxDiagnostics(ILogger<InboxDiagnostics> logger) : IDispos
                             level = nameof(LogLevel.Warning),
                             code = "diagnostics.truncated",
                             message = "Attempt diagnostics exceeded the fixed entry/byte limit.",
-                            dropped_entries = _dropped,
+                            droppedEntries = _dropped,
                         }
                     )
                 );

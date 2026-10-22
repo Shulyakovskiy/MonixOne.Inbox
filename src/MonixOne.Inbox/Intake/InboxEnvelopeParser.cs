@@ -18,13 +18,13 @@ internal static class InboxEnvelopeParser
             var metadata = adapter is not null
                 ? adapter.Extract(root)
                 : new InboxEventMetadata(
-                    Text(root, "event_id"),
+                    Text(root, "eventId"),
                     Text(root, "producer"),
-                    Text(root, "sequence_scope"),
-                    Text(root, "object_key"),
+                    Text(root, "sequenceScope"),
+                    Text(root, "objectKey"),
                     At(root, "sequence").GetInt64(),
-                    Text(root, "event_type"),
-                    OccurredAt(root, "occurred_at")
+                    Text(root, "eventType"),
+                    OccurredAt(root, "occurredAt")
                 );
             if (
                 !ValidText(metadata.EventId, 512)

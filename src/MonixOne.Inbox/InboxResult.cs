@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MonixOne.Inbox;
 
@@ -55,27 +56,32 @@ public sealed record InboxResult
     /// <summary>
     /// Решение о commit, пропуске, повторе или окончательной ошибке.
     /// </summary>
+    [JsonPropertyName("kind")]
     public InboxResultKind Kind { get; }
 
     /// <summary>
     /// Непустой машинный код результата для журнала и диагностики.
     /// </summary>
+    [JsonPropertyName("code")]
     public string Code { get; }
 
     /// <summary>
     /// Причина пропуска, повтора или отклонения; для Applied не нужна.
     /// </summary>
+    [JsonPropertyName("reason")]
     public string? Reason { get; }
 
     /// <summary>
     /// Явная положительная задержка Retry; null использует автоматическую retry-политику.
     /// </summary>
+    [JsonPropertyName("retryAfter")]
     public TimeSpan? RetryAfter { get; }
 
     /// <summary>
     /// Структурированная диагностика; копия JSON сохраняется после освобождения исходного документа.
     /// Лимит: 64 KiB / глубина 32; превышение заменяется безопасным fallback без изменения Kind.
     /// </summary>
+    [JsonPropertyName("details")]
     public JsonElement? Details { get; }
 
     /// <summary>
