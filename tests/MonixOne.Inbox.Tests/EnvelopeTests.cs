@@ -11,13 +11,13 @@ public sealed class EnvelopeTests
 {
     private const string DocumentationEnvelope = """
         {
-          "event_id": "profile:updated:42:157",
+          "eventId": "profile:updated:42:157",
           "producer": "profiles",
-          "sequence_scope": "profiles",
-          "object_key": "42",
+          "sequenceScope": "profiles",
+          "objectKey": "42",
           "sequence": 157,
-          "event_type": "profile.updated",
-          "occurred_at": "2026-10-09T07:00:00Z",
+          "eventType": "profile.updated",
+          "occurredAt": "2026-10-09T07:00:00Z",
           "payload": { "name": "Example" }
         }
         """;
@@ -35,10 +35,29 @@ public sealed class EnvelopeTests
         Assert.Equal(DocumentationEnvelope, parsed.Json);
     }
 
+    [Fact]
+    public void Metadata_serialized_with_default_options_is_a_valid_camel_case_envelope()
+    {
+        var metadata = new InboxEventMetadata("profile:updated:42:157", "profiles", "profiles", "42", 157,
+            "profile.updated", new DateTimeOffset(2026, 10, 9, 7, 0, 0, TimeSpan.Zero));
+        var raw = JsonSerializer.SerializeToUtf8Bytes(metadata);
+
+        var parsed = InboxEnvelopeParser.Parse(raw);
+
+        Assert.Null(parsed.Error);
+        Assert.Equal(metadata, parsed.Metadata);
+        Assert.Equal(metadata, JsonSerializer.Deserialize<InboxEventMetadata>(raw));
+    }
+
     [Theory]
     [InlineData("\"sequence\": 157", "\"sequence\": \"157\"")]
-    [InlineData("\"object_key\": \"42\"", "\"object_key\": 42")]
-    [InlineData("\"event_id\"", "\"eventId\"")]
+    [InlineData("\"objectKey\": \"42\"", "\"objectKey\": 42")]
+    [InlineData("\"eventId\"", "\"event_id\"")]
+    [InlineData("\"eventId\"", "\"EventId\"")]
+    [InlineData("\"sequenceScope\"", "\"sequence_scope\"")]
+    [InlineData("\"objectKey\"", "\"object_key\"")]
+    [InlineData("\"eventType\"", "\"event_type\"")]
+    [InlineData("\"occurredAt\"", "\"occurred_at\"")]
     [InlineData("2026-10-09T07:00:00Z", "2026-10-09T07:00:00")]
     public void Required_fields_use_exact_names_and_json_types(string original, string replacement)
     {
@@ -96,8 +115,8 @@ public sealed class EnvelopeTests
     {
         var raw = Encoding.UTF8.GetBytes(
             $$"""
-            {"event_id":"created-1","producer":"p","sequence_scope":"s","object_key":"k",
-             "sequence":{{sequence}},"event_type":"object.created","occurred_at":"2026-10-08T01:00:00Z"}
+            {"eventId":"created-1","producer":"p","sequenceScope":"s","objectKey":"k",
+             "sequence":{{sequence}},"eventType":"object.created","occurredAt":"2026-10-08T01:00:00Z"}
             """
         );
         var parsed = InboxEnvelopeParser.Parse(raw, null);

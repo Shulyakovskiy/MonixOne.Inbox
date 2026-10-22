@@ -64,7 +64,7 @@ public sealed partial class ProcessingTests
         await SqlAsync($"UPDATE \"{_schema}\".inbox SET received_at = now() - interval '2 hours' WHERE sequence = 162");
         Assert.True(await ProcessAsync(restarted));
         Assert.Equal(1, await CountAsync("inbox_journal", "decision = 'gap_skipped' AND " +
-            "details ->> 'first_missing' = '160' AND details ->> 'last_missing' = '161'"));
+            "details ->> 'firstMissing' = '160' AND details ->> 'lastMissing' = '161'"));
         await SeedAsync(restarted, 160);
         var before = _probe.Calls.Count;
         Assert.True(await ProcessAsync(restarted));
@@ -91,7 +91,7 @@ public sealed partial class ProcessingTests
         Assert.True(await ProcessAsync(host));
         Assert.Equal(1, await CountAsync("consumer_state", "last_sequence = 160 AND version = 3"));
         Assert.Equal(1, await CountAsync("inbox_journal", "decision = 'gap_skipped' AND " +
-            "details ->> 'first_missing' = '158' AND details ->> 'last_missing' = '159'"));
+            "details ->> 'firstMissing' = '158' AND details ->> 'lastMissing' = '159'"));
         await SeedAsync(host, 161);
         _probe.Handle = (_, _, _) => Task.FromResult(InboxResult.Applied);
         Assert.True(await ProcessAsync(host));
@@ -162,7 +162,7 @@ public sealed partial class ProcessingTests
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _probe.Handle = async (_, message, token) =>
         {
-            if (message.GetProperty("object_key").GetString() == "object-1")
+            if (message.GetProperty("objectKey").GetString() == "object-1")
             {
                 entered.TrySetResult();
                 await release.Task.WaitAsync(token);
@@ -286,7 +286,7 @@ public sealed partial class ProcessingTests
         await SeedAsync(host, 157, "other");
         using var json = JsonDocument.Parse(Event(157, "other"));
         var incoming = json.RootElement.EnumerateObject().ToDictionary(x => x.Name, x => x.Value.Clone());
-        incoming["event_id"] = JsonSerializer.SerializeToElement("object:created:object-1:157");
+        incoming["eventId"] = JsonSerializer.SerializeToElement("object:created:object-1:157");
         await SaveRawAsync(host, JsonSerializer.SerializeToUtf8Bytes(incoming));
         await SqlAsync($"UPDATE \"{_schema}\".inbox_dlq SET created_at = now() - interval '100 days'");
         // Conflict history tied to active work must survive; unrelated invalid history can expire.
@@ -333,7 +333,7 @@ public sealed partial class ProcessingTests
         Assert.True(await ProcessAsync(host));
         Assert.Equal(new long[] { 157, 159 }, _probe.Calls.Select(x => x.Sequence));
         Assert.Equal(1, await CountAsync("inbox_dlq", "category = 'invalid_message'"));
-        Assert.Equal(1, await CountAsync("inbox_journal", "decision = 'gap_skipped' AND details ->> 'first_missing' = '158' AND details ->> 'last_missing' = '158'"));
+        Assert.Equal(1, await CountAsync("inbox_journal", "decision = 'gap_skipped' AND details ->> 'firstMissing' = '158' AND details ->> 'lastMissing' = '158'"));
     }
 
     [Fact]
@@ -344,7 +344,7 @@ public sealed partial class ProcessingTests
         using var document = JsonDocument.Parse(Event(155));
         var values = document.RootElement.EnumerateObject().ToDictionary(x => x.Name, x => x.Value.Clone());
         values["producer"] = JsonSerializer.SerializeToElement("another-service");
-        values["event_id"] = JsonSerializer.SerializeToElement("another-service:object:created:155");
+        values["eventId"] = JsonSerializer.SerializeToElement("another-service:object:created:155");
         await SaveRawAsync(host, JsonSerializer.SerializeToUtf8Bytes(values));
         Assert.True(await ProcessAsync(host));
         Assert.True(await ProcessAsync(host));
@@ -362,7 +362,7 @@ public sealed partial class ProcessingTests
         Assert.True(await ProcessAsync(host));
         var id = await ScalarAsync<Guid>($"SELECT id FROM \"{_schema}\".inbox_dlq");
         var page = (await HistoryAsync(host, id))!;
-        Assert.Equal(Event(157), Convert.FromBase64String(page.Inbox!.Value.GetProperty("raw_payload").GetString()!));
+        Assert.Equal(Event(157), Convert.FromBase64String(page.Inbox!.Value.GetProperty("rawPayload").GetString()!));
         Assert.Equal(1, await CountAsync("inbox_dlq", "envelope IS NULL AND octet_length(raw_payload) = 0 AND source = '{}'::jsonb"));
         Assert.Equal("dead", page.Inbox.Value.GetProperty("status").GetString());
     }

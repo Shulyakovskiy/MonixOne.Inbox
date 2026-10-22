@@ -16,7 +16,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyDescriptionAttribute(("Ordered inbox for .NET 10, EF Core, PostgreSQL and NATS JetStream with transactio" +
     "nal handlers, per-key ordering, deduplication, retries and dead-letter storage."))]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.1.1.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.1.1+2faca79ae34bebc733e823c1cc948d22b18006be")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.1.1+4340b9623ec00cb5c7b294ea098a50ff16e61772")]
 [assembly: System.Reflection.AssemblyProductAttribute("MonixOne.Inbox")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MonixOne.Inbox")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.1.1.0")]

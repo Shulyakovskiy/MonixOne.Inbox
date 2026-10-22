@@ -59,7 +59,7 @@ sealed class LocationsHandler(InboxDiagnostics diagnostics) : IInboxHandler<AppD
         diagnostics.Write(
             "location.event.ignored",
             "Registration example has no business projection.",
-            JsonSerializer.SerializeToElement(new { event_type = message.GetProperty("event_type").GetString() })
+            JsonSerializer.SerializeToElement(new { eventType = message.GetProperty("eventType").GetString() })
         );
         return Task.FromResult(InboxResult.Ignore("Registration example has no business projection."));
     }

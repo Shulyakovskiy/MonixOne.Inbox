@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MonixOne.Inbox;
 
@@ -33,11 +34,11 @@ public interface IInboxEnvelopeAdapter
 /// Время факта; при сохранении нормализуется в UTC и до микросекунд.
 /// </param>
 public sealed record InboxEventMetadata(
-    string EventId,
-    string Producer,
-    string SequenceScope,
-    string ObjectKey,
-    long Sequence,
-    string EventType,
-    DateTimeOffset OccurredAt
+    [property: JsonPropertyName("eventId")] string EventId,
+    [property: JsonPropertyName("producer")] string Producer,
+    [property: JsonPropertyName("sequenceScope")] string SequenceScope,
+    [property: JsonPropertyName("objectKey")] string ObjectKey,
+    [property: JsonPropertyName("sequence")] long Sequence,
+    [property: JsonPropertyName("eventType")] string EventType,
+    [property: JsonPropertyName("occurredAt")] DateTimeOffset OccurredAt
 );

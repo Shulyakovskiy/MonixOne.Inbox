@@ -63,13 +63,13 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         await host.StartAsync(Token);
         var raw = """
             {
-              "event_id": "profile:updated:42:157",
+              "eventId": "profile:updated:42:157",
               "producer": "profiles",
-              "sequence_scope": "profiles",
-              "object_key": "42",
+              "sequenceScope": "profiles",
+              "objectKey": "42",
               "sequence": 157,
-              "event_type": "profile.updated",
-              "occurred_at": "2026-10-09T07:00:00Z",
+              "eventType": "profile.updated",
+              "occurredAt": "2026-10-09T07:00:00Z",
               "payload": { "name": "Example" }
             }
             """u8.ToArray();
@@ -122,7 +122,14 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         Assert.DoesNotContain("private", source);
         Assert.Contains("[REDACTED]", source);
         Assert.Contains("correlation-1", source);
-        Assert.Contains("stream_sequence", source);
+        using var sourceJson = JsonDocument.Parse(source);
+        Assert.Equal(new[] { "connection", "stream", "consumer", "domain", "subject", "streamCreatedAt",
+                "streamSequence", "consumerSequence", "deliveryCount", "pending", "publishedAt", "receivedAt", "headers" }
+                .Order(),
+            sourceJson.RootElement.EnumerateObject().Select(x => x.Name).Order());
+        Assert.True(sourceJson.RootElement.GetProperty("streamSequence").GetUInt64() > 0);
+        Assert.Equal("correlation-1",
+            sourceJson.RootElement.GetProperty("headers").GetProperty("x-correlation-id")[0].GetString());
         await UntilAsync(async () => (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0);
     }
 
@@ -318,10 +325,10 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
             // The adapter itself is scoped, and its dependencies come from this exact intake operation.
             Assert.Null(db.Database.CurrentTransaction);
             var original = message.GetProperty("metadata");
-            return new(original.GetProperty("event_id").GetString()!, original.GetProperty("producer").GetString()!,
-                original.GetProperty("sequence_scope").GetString()!, original.GetProperty("object_key").GetString()!,
-                original.GetProperty("sequence").GetInt64(), original.GetProperty("event_type").GetString()!,
-                original.GetProperty("occurred_at").GetDateTimeOffset());
+            return new(original.GetProperty("eventId").GetString()!, original.GetProperty("producer").GetString()!,
+                original.GetProperty("sequenceScope").GetString()!, original.GetProperty("objectKey").GetString()!,
+                original.GetProperty("sequence").GetInt64(), original.GetProperty("eventType").GetString()!,
+                original.GetProperty("occurredAt").GetDateTimeOffset());
         }
     }
 
@@ -434,13 +441,13 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         JsonSerializer.SerializeToUtf8Bytes(
             new
             {
-                event_id = id,
+                eventId = id,
                 producer = "service",
-                sequence_scope = "objects",
-                object_key = key,
+                sequenceScope = "objects",
+                objectKey = key,
                 sequence,
-                event_type = "object.created",
-                occurred_at = "2026-10-08T01:00:00.1234567Z",
+                eventType = "object.created",
+                occurredAt = "2026-10-08T01:00:00.1234567Z",
                 payload = new { value },
             }
         );

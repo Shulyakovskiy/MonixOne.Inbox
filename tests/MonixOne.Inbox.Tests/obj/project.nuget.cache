@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "K9Mo0iF3PFw=",
+  "dgSpecHash": "C8qRA/w+IDw=",
   "success": true,
   "projectFilePath": "/Volumes/EXT-DATA/GIT/BeetRoute/GIT/nuget/MonixOne.Inbox/tests/MonixOne.Inbox.Tests/MonixOne.Inbox.Tests.csproj",
   "expectedPackageFiles": [
@@ -80,7 +80,8 @@
     "/Users/sea/.nuget/packages/xunit.v3.extensibility.core/4.0.0/xunit.v3.extensibility.core.4.0.0.nupkg.sha512",
     "/Users/sea/.nuget/packages/xunit.v3.mtp-v2/4.0.0/xunit.v3.mtp-v2.4.0.0.nupkg.sha512",
     "/Users/sea/.nuget/packages/xunit.v3.runner.common/4.0.0/xunit.v3.runner.common.4.0.0.nupkg.sha512",
-    "/Users/sea/.nuget/packages/xunit.v3.runner.inproc.console/4.0.0/xunit.v3.runner.inproc.console.4.0.0.nupkg.sha512"
+    "/Users/sea/.nuget/packages/xunit.v3.runner.inproc.console/4.0.0/xunit.v3.runner.inproc.console.4.0.0.nupkg.sha512",
+    "/Users/sea/.nuget/packages/monixone.inbox/1.1.1/monixone.inbox.1.1.1.nupkg.sha512"
   ],
   "logs": []
 }
