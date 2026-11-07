@@ -11,7 +11,10 @@ public sealed class OrderedInboxBuilder<TDbContext>
     private readonly IServiceCollection _services;
     private readonly InboxRegistration<TDbContext> _registration;
 
-    internal OrderedInboxBuilder(IServiceCollection services, InboxRegistration<TDbContext> registration)
+    internal OrderedInboxBuilder(
+        IServiceCollection services,
+        InboxRegistration<TDbContext> registration
+    )
     {
         _services = services;
         _registration = registration;
@@ -66,8 +69,14 @@ public sealed class OrderedInboxBuilder<TDbContext>
     private void CheckHandlerId(string handlerId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(handlerId);
-        if (_registration.Handlers.Any(h => string.Equals(h.Id, handlerId, StringComparison.OrdinalIgnoreCase)))
-            throw new ArgumentException($"Handler '{handlerId}' is already registered.", nameof(handlerId));
+        if (
+            _registration.Handlers.Any(h =>
+                string.Equals(h.Id, handlerId, StringComparison.OrdinalIgnoreCase)
+            )
+        )
+            throw new ArgumentException(
+                $"Handler '{handlerId}' is already registered.",
+                nameof(handlerId)
+            );
     }
-
 }

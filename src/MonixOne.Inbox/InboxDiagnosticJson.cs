@@ -18,10 +18,14 @@ internal static class InboxDiagnosticJson
             var json = value.Value.GetRawText();
             if (Encoding.UTF8.GetByteCount(json) > MaxBytes)
                 return Fallback;
-            using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = MaxDepth });
+            using var document = JsonDocument.Parse(
+                json,
+                new JsonDocumentOptions { MaxDepth = MaxDepth }
+            );
             return json;
         }
-        catch (Exception error) when (error is JsonException or InvalidOperationException or ObjectDisposedException)
+        catch (Exception error)
+            when (error is JsonException or InvalidOperationException or ObjectDisposedException)
         {
             return Fallback;
         }

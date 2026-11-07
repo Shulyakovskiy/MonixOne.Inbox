@@ -30,7 +30,11 @@ internal sealed class InboxIntake<TDbContext>(
             var connection = subscription.ConnectionName is null
                 ? services.GetRequiredService<INatsConnection>()
                 : services.GetRequiredKeyedService<INatsConnection>(subscription.ConnectionName);
-            var worker = new SubscriptionWorker(handler, subscription, new NatsJSContext(connection));
+            var worker = new SubscriptionWorker(
+                handler,
+                subscription,
+                new NatsJSContext(connection)
+            );
             await BindAsync(worker, token);
             _subscriptions.Add(worker);
             logger.LogInformation(
@@ -69,7 +73,11 @@ internal sealed class InboxIntake<TDbContext>(
         INatsJSConsumer consumer;
         try
         {
-            consumer = await worker.Context.GetConsumerAsync(options.Stream, options.DurableName, token);
+            consumer = await worker.Context.GetConsumerAsync(
+                options.Stream,
+                options.DurableName,
+                token
+            );
         }
         catch (NatsJSApiException error) when (error.Error.Code == 404)
         {
@@ -93,7 +101,11 @@ internal sealed class InboxIntake<TDbContext>(
             catch (NatsJSApiException)
             {
                 // Another replica may have won creation; read and validate its consumer.
-                consumer = await worker.Context.GetConsumerAsync(options.Stream, options.DurableName, token);
+                consumer = await worker.Context.GetConsumerAsync(
+                    options.Stream,
+                    options.DurableName,
+                    token
+                );
             }
         }
         ValidateConsumer(consumer.Info.Config, options);
@@ -139,9 +151,17 @@ internal sealed class InboxIntake<TDbContext>(
                 var inFlight = new HashSet<Task>();
                 try
                 {
-                    await foreach (var message in worker.Consumer!.FetchAsync<byte[]>(
-                        new NatsJSFetchOpts { MaxMsgs = worker.Settings.BatchSize, Expires = TimeSpan.FromSeconds(2) },
-                        NatsRawSerializer<byte[]>.Default, token))
+                    await foreach (
+                        var message in worker.Consumer!.FetchAsync<byte[]>(
+                            new NatsJSFetchOpts
+                            {
+                                MaxMsgs = worker.Settings.BatchSize,
+                                Expires = TimeSpan.FromSeconds(2),
+                            },
+                            NatsRawSerializer<byte[]>.Default,
+                            token
+                        )
+                    )
                     {
                         // Bounded operations; each owns its context. Drain the current fetch before another batch.
                         inFlight.Add(SaveAndAckAsync(worker, message, token));
@@ -194,16 +214,33 @@ internal sealed class InboxIntake<TDbContext>(
         }
     }
 
-    private async Task SaveAndAckAsync(SubscriptionWorker worker, INatsJSMsg<byte[]> message, CancellationToken token)
+    private async Task SaveAndAckAsync(
+        SubscriptionWorker worker,
+        INatsJSMsg<byte[]> message,
+        CancellationToken token
+    )
     {
         var delivery = CreateDelivery(message, worker.Settings, worker.StreamCreated);
         await using var scope = scopes.CreateAsyncScope();
         var store = scope.ServiceProvider.GetRequiredService<InboxIntakeStore<TDbContext>>();
-        var decision = await store.SaveAsync(worker.Handler, worker.Settings, delivery, _worker, token);
+        var decision = await store.SaveAsync(
+            worker.Handler,
+            worker.Settings,
+            delivery,
+            _worker,
+            token
+        );
         await message.AckAsync(new AckOpts { DoubleAck = true }, token);
-        logger.Log(decision.Kind is "conflict" or "invalid_message" ? LogLevel.Warning : LogLevel.Debug,
+        logger.Log(
+            decision.Kind is "conflict" or "invalid_message" ? LogLevel.Warning : LogLevel.Debug,
             "OrderedInbox {Decision}: {HandlerId}/{SubscriptionId}, inbox {InboxId}, DLQ {DlqId}, worker {Worker}.",
-            decision.Kind, worker.Handler.Id, worker.Settings.Id, decision.InboxId, decision.DlqId, _worker);
+            decision.Kind,
+            worker.Handler.Id,
+            worker.Settings.Id,
+            decision.InboxId,
+            decision.DlqId,
+            _worker
+        );
     }
 
     internal static InboxDelivery CreateDelivery(
@@ -213,13 +250,20 @@ internal sealed class InboxIntake<TDbContext>(
     )
     {
         var metadata =
-            message.Metadata ?? throw new InvalidOperationException("JetStream delivery metadata is required.");
+            message.Metadata
+            ?? throw new InvalidOperationException("JetStream delivery metadata is required.");
         var headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
         if (message.Headers is { } sourceHeaders)
             foreach (var header in sourceHeaders)
-                headers[header.Key.Replace("\0", "\\u0000", StringComparison.Ordinal)] = Sensitive(header.Key)
+                headers[header.Key.Replace("\0", "\\u0000", StringComparison.Ordinal)] = Sensitive(
+                    header.Key
+                )
                     ? ["[REDACTED]"]
-                    : header.Value.Select(x => (x ?? "").Replace("\0", "\\u0000", StringComparison.Ordinal)).ToArray();
+                    : header
+                        .Value.Select(x =>
+                            (x ?? "").Replace("\0", "\\u0000", StringComparison.Ordinal)
+                        )
+                        .ToArray();
         var source = JsonSerializer.Serialize(
             new
             {
@@ -246,16 +290,26 @@ internal sealed class InboxIntake<TDbContext>(
                 metadata.Domain,
                 metadata.Stream,
                 streamCreated.ToString("O"),
-                metadata.Sequence.Stream.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                metadata.Sequence.Stream.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture
+                ),
             }
         );
         return new(message.Data ?? [], source, identity);
     }
 
     private static bool Sensitive(string key) =>
-        new[] { "authorization", "cookie", "password", "secret", "token", "credential", "api-key", "apikey" }.Any(x =>
-            key.Contains(x, StringComparison.OrdinalIgnoreCase)
-        );
+        new[]
+        {
+            "authorization",
+            "cookie",
+            "password",
+            "secret",
+            "token",
+            "credential",
+            "api-key",
+            "apikey",
+        }.Any(x => key.Contains(x, StringComparison.OrdinalIgnoreCase));
 
     private sealed class SubscriptionWorker(
         InboxHandlerRegistration<TDbContext> handler,

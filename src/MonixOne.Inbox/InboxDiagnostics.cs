@@ -72,7 +72,9 @@ public sealed class InboxDiagnostics(ILogger<InboxDiagnostics> logger) : IDispos
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            attemptId = _attemptId ?? throw new InvalidOperationException("No active OrderedInbox business attempt.");
+            attemptId =
+                _attemptId
+                ?? throw new InvalidOperationException("No active OrderedInbox business attempt.");
             var bytes = JsonSerializer.SerializeToUtf8Bytes(
                 new
                 {
@@ -89,7 +91,10 @@ public sealed class InboxDiagnostics(ILogger<InboxDiagnostics> logger) : IDispos
                 _dropped++;
             else
             {
-                using var json = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 128 });
+                using var json = JsonDocument.Parse(
+                    bytes,
+                    new JsonDocumentOptions { MaxDepth = 128 }
+                );
                 _entries.Add(json.RootElement.Clone());
                 _bytes += bytes.Length + 1;
             }

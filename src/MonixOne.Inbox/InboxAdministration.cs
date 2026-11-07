@@ -28,10 +28,7 @@ public sealed class InboxAdministration<TDbContext>
     private readonly TDbContext _context;
     private readonly string _schema;
 
-    internal InboxAdministration(
-        TDbContext context,
-        InboxCatalog<TDbContext> catalog
-    )
+    internal InboxAdministration(TDbContext context, InboxCatalog<TDbContext> catalog)
     {
         _context = context;
         _schema = catalog.Settings.Schema;
@@ -97,7 +94,10 @@ public sealed class InboxAdministration<TDbContext>
     {
         ArgumentOutOfRangeException.ThrowIfNegative(afterJournalId);
         if (pageSize is < 1 or > 200)
-            throw new ArgumentOutOfRangeException(nameof(pageSize), "Page size must be between 1 and 200.");
+            throw new ArgumentOutOfRangeException(
+                nameof(pageSize),
+                "Page size must be between 1 and 200."
+            );
         EnsureOwnTransaction();
         return _context
             .Database.CreateExecutionStrategy()
@@ -113,16 +113,24 @@ public sealed class InboxAdministration<TDbContext>
                     InboxDlqRow? letter = null;
                     if (deadLetterId is not null)
                     {
-                        letter = await letters.SingleOrDefaultAsyncLinqToDB(x => x.Id == deadLetterId, cancellation);
+                        letter = await letters.SingleOrDefaultAsyncLinqToDB(
+                            x => x.Id == deadLetterId,
+                            cancellation
+                        );
                         if (letter is null)
                             return null;
                     }
-                    var currentInboxId = letter is null ? inboxId : letter.InboxId ?? letter.RelatedInboxId;
+                    var currentInboxId = letter is null
+                        ? inboxId
+                        : letter.InboxId ?? letter.RelatedInboxId;
                     var row = currentInboxId is null
                         ? null
                         : await data.GetTable<InboxRow>()
                             .SchemaName(_schema)
-                            .SingleOrDefaultAsyncLinqToDB(x => x.Id == currentInboxId, cancellation);
+                            .SingleOrDefaultAsyncLinqToDB(
+                                x => x.Id == currentInboxId,
+                                cancellation
+                            );
                     if (row is null && letter is null)
                         return null;
                     var state = row is null
@@ -156,7 +164,10 @@ public sealed class InboxAdministration<TDbContext>
                         .Select(x => x.AttemptId!.Value)
                         .Distinct()
                         .ToArray();
-                    var dlqIds = rows.Where(x => x.DlqId is not null).Select(x => x.DlqId!.Value).Distinct().ToArray();
+                    var dlqIds = rows.Where(x => x.DlqId is not null)
+                        .Select(x => x.DlqId!.Value)
+                        .Distinct()
+                        .ToArray();
                     var attempts =
                         attemptIds.Length == 0
                             ? []
@@ -170,13 +181,20 @@ public sealed class InboxAdministration<TDbContext>
                             : await letters
                                 .Where(x => Enumerable.Contains(dlqIds, x.Id))
                                 .ToListAsyncLinqToDB(cancellation);
-                    var attemptSnapshots = attempts.ToDictionary(x => x.AttemptId, x => Snapshot(x)!.Value);
+                    var attemptSnapshots = attempts.ToDictionary(
+                        x => x.AttemptId,
+                        x => Snapshot(x)!.Value
+                    );
                     var dlqSnapshots = dlqs.ToDictionary(x => x.Id, x => Snapshot(x)!.Value);
                     var entries = rows.Select(x => new InboxHistoryEntry(
                             x.Id,
                             Snapshot(x)!.Value,
-                            x.AttemptId is { } a && attemptSnapshots.TryGetValue(a, out var attempt) ? attempt : null,
-                            x.DlqId is { } d && dlqSnapshots.TryGetValue(d, out var dlq) ? dlq : null
+                            x.AttemptId is { } a && attemptSnapshots.TryGetValue(a, out var attempt)
+                                ? attempt
+                                : null,
+                            x.DlqId is { } d && dlqSnapshots.TryGetValue(d, out var dlq)
+                                ? dlq
+                                : null
                         ))
                         .ToArray();
                     var page = new InboxHistoryPage(

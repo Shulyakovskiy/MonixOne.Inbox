@@ -37,7 +37,10 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
     {
         _nats = new(NatsOpts.Default with { Url = infrastructure.NatsUrl });
         _js = new(_nats);
-        await _js.CreateStreamAsync(new StreamConfig(_stream, [$"{_subject}.>"]), cancellationToken: Token);
+        await _js.CreateStreamAsync(
+            new StreamConfig(_stream, [$"{_subject}.>"]),
+            cancellationToken: Token
+        );
         LinqToDBForEFTools.Initialize();
         await using var db = new TestDb(
             new DbContextOptionsBuilder<TestDb>().UseNpgsql(infrastructure.ConnectionString).Options
@@ -86,7 +89,10 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
                     + "AND trace_id = '0123456789abcdef0123456789abcdef'"
             )
         );
-        Assert.Equal(1, await CountAsync("inbox_journal", "decision = 'processed' AND attempt_id IS NOT NULL"));
+        Assert.Equal(
+            1,
+            await CountAsync("inbox_journal", "decision = 'processed' AND attempt_id IS NOT NULL")
+        );
         Assert.Single(_probe.Calls);
     }
 
@@ -106,7 +112,11 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
                 result switch
                 {
                     "ignore" => InboxResult.Ignore("No business effect", "ignored_type"),
-                    "retry" => InboxResult.Retry("Dependency missing", TimeSpan.FromSeconds(20), "dependency_missing"),
+                    "retry" => InboxResult.Retry(
+                        "Dependency missing",
+                        TimeSpan.FromSeconds(20),
+                        "dependency_missing"
+                    ),
                     _ => InboxResult.Reject("Invalid business event", "invalid_business_event"),
                 }
             );
@@ -117,7 +127,13 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         Assert.Equal(0, await ScalarAsync<long>("SELECT count(*) FROM public.processing_outbox"));
         Assert.Equal(1, await CountAsync("inbox", $"status = '{status}' AND attempt_count = 1"));
         Assert.Equal(1, await CountAsync("inbox_attempts", $"outcome = '{outcome}'"));
-        Assert.Equal(1, await CountAsync("consumer_state", advance ? "last_sequence = 1" : "last_sequence IS NULL"));
+        Assert.Equal(
+            1,
+            await CountAsync(
+                "consumer_state",
+                advance ? "last_sequence = 1" : "last_sequence IS NULL"
+            )
+        );
         Assert.Equal(result == "reject" ? 1 : 0, await CountAsync("inbox_dlq"));
     }
 
@@ -128,14 +144,20 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         {
             using var details = JsonDocument.Parse("{\"dependency\":\"profile\"}");
             return Task.FromResult(
-                InboxResult.Retry("Dependency missing", TimeSpan.FromDays(1), "dependency", details.RootElement)
+                InboxResult.Retry(
+                    "Dependency missing",
+                    TimeSpan.FromDays(1),
+                    "dependency",
+                    details.RootElement
+                )
             );
         };
         var host = HostFor(configure: h => h.Retry.MaxDelay = TimeSpan.FromSeconds(3));
         await SeedAsync(host, 1);
         Assert.True(await ProcessAsync(host));
         var seconds = await ScalarAsync<double>(
-            $"SELECT extract(epoch FROM next_attempt_at - updated_at)::float8 " + $"FROM \"{_schema}\".inbox"
+            $"SELECT extract(epoch FROM next_attempt_at - updated_at)::float8 "
+                + $"FROM \"{_schema}\".inbox"
         );
         Assert.InRange(seconds, 2.5, 3);
         Assert.Equal(1, await CountAsync("inbox_attempts", "details ->> 'dependency' = 'profile'"));
@@ -145,7 +167,8 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
     [Fact]
     public async Task Lower_retry_budget_after_restart_finishes_without_extra_business_invocation()
     {
-        _probe.Handle = (_, _, _) => Task.FromResult(InboxResult.Retry("Wait", TimeSpan.FromMilliseconds(1)));
+        _probe.Handle = (_, _, _) =>
+            Task.FromResult(InboxResult.Retry("Wait", TimeSpan.FromMilliseconds(1)));
         var host = HostFor();
         await SeedAsync(host, 1);
         Assert.True(await ProcessAsync(host));
@@ -154,7 +177,10 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         Assert.True(await ProcessAsync(restarted));
         Assert.Single(_probe.Calls);
         Assert.Equal(1, await CountAsync("inbox_attempts"));
-        Assert.Equal(1, await CountAsync("inbox_dlq", "code = 'retry_exhausted' AND cursor_advanced"));
+        Assert.Equal(
+            1,
+            await CountAsync("inbox_dlq", "code = 'retry_exhausted' AND cursor_advanced")
+        );
     }
 
     [Fact]
@@ -162,7 +188,9 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
     {
         var first = true;
         _probe.Handle = (_, _, _) =>
-            Task.FromResult(first ? InboxResult.Retry("Wait", TimeSpan.FromSeconds(20)) : InboxResult.Applied);
+            Task.FromResult(
+                first ? InboxResult.Retry("Wait", TimeSpan.FromSeconds(20)) : InboxResult.Applied
+            );
         var host = HostFor();
         await SeedAsync(host, 1);
         await SeedAsync(host, 2);
@@ -172,9 +200,16 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         var restarted = HostFor();
         Assert.True(await ProcessAsync(restarted)); // The ready other object gets progress.
         Assert.False(await ProcessAsync(restarted));
-        Assert.Equal(1, await CountAsync("inbox", "object_key = 'object-1' AND sequence = 2 AND status = 'pending'"));
+        Assert.Equal(
+            1,
+            await CountAsync(
+                "inbox",
+                "object_key = 'object-1' AND sequence = 2 AND status = 'pending'"
+            )
+        );
         await SqlAsync(
-            $"UPDATE \"{_schema}\".inbox SET next_attempt_at = now() - interval '1 second' " + "WHERE status = 'retry'"
+            $"UPDATE \"{_schema}\".inbox SET next_attempt_at = now() - interval '1 second' "
+                + "WHERE status = 'retry'"
         );
         Assert.True(await ProcessAsync(restarted));
         Assert.True(await ProcessAsync(restarted));
@@ -190,7 +225,11 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
                 message.GetProperty("objectKey").GetString() == "other"
                 || message.GetProperty("sequence").GetInt64() == 2
                     ? InboxResult.Applied
-                    : InboxResult.Retry("Dependency missing", TimeSpan.FromMilliseconds(1), "dependency")
+                    : InboxResult.Retry(
+                        "Dependency missing",
+                        TimeSpan.FromMilliseconds(1),
+                        "dependency"
+                    )
             );
         var host = HostFor(configure: h =>
         {
@@ -220,13 +259,7 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
                     + $"JOIN \"{_schema}\".inbox_dlq d ON d.inbox_id = a.inbox_id AND d.run_id = a.run_id"
             )
         );
-        Assert.Equal(
-            1,
-            await CountAsync(
-                "consumer_state",
-                "last_sequence = 1"
-            )
-        );
+        Assert.Equal(1, await CountAsync("consumer_state", "last_sequence = 1"));
         Assert.True(await ProcessAsync(host));
         await SeedAsync(host, 1, "other");
         Assert.True(await ProcessAsync(host));
@@ -270,7 +303,8 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         _probe.Handle = async (db, _, ct) =>
         {
             await db.Database.ExecuteSqlRawAsync(
-                "INSERT INTO public.processing_outbox SELECT event_id " + "FROM public.processing_outbox",
+                "INSERT INTO public.processing_outbox SELECT event_id "
+                    + "FROM public.processing_outbox",
                 ct
             );
             return InboxResult.Applied;
@@ -280,14 +314,19 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         Assert.True(await ProcessAsync(host));
         Assert.Equal(0, await BusinessCountAsync());
         Assert.Equal(0, await ScalarAsync<long>("SELECT count(*) FROM public.processing_outbox"));
-        Assert.Equal(1, await CountAsync("inbox_attempts", "outcome = 'retry' AND exception LIKE '%23505%'"));
+        Assert.Equal(
+            1,
+            await CountAsync("inbox_attempts", "outcome = 'retry' AND exception LIKE '%23505%'")
+        );
         Assert.Equal(1, await CountAsync("inbox", "status = 'retry' AND attempt_count = 1"));
     }
 
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task Timeout_rolls_back_and_waits_for_callback_completion_even_if_token_is_ignored(bool cooperative)
+    public async Task Timeout_rolls_back_and_waits_for_callback_completion_even_if_token_is_ignored(
+        bool cooperative
+    )
     {
         _probe.Handle = async (_, _, ct) =>
         {
@@ -309,10 +348,15 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         if (!cooperative)
             Assert.True(timer.Elapsed >= TimeSpan.FromMilliseconds(250));
         Assert.Equal(0, await BusinessCountAsync());
-        Assert.Equal(1, await CountAsync("inbox_attempts", "outcome = 'timeout' AND code = 'handler_timeout'"));
+        Assert.Equal(
+            1,
+            await CountAsync("inbox_attempts", "outcome = 'timeout' AND code = 'handler_timeout'")
+        );
         Assert.DoesNotContain(
             logs.Records,
-            x => x.Fields.GetValueOrDefault("DiagnosticCode") as string == "exception_classifier.failed"
+            x =>
+                x.Fields.GetValueOrDefault("DiagnosticCode") as string
+                == "exception_classifier.failed"
         );
         Assert.Equal(1, await CountAsync("consumer_state", "last_sequence IS NULL"));
     }
@@ -328,7 +372,10 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
             return InboxResult.Applied;
         };
         var logs = new LogCapture();
-        var host = HostFor(configure: h => h.ClassifyException = UnexpectedClassification, logs: logs);
+        var host = HostFor(
+            configure: h => h.ClassifyException = UnexpectedClassification,
+            logs: logs
+        );
         await SeedAsync(host, 1);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(Token);
         var processing = ProcessAsync(host, stop.Token);
@@ -339,7 +386,9 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         Assert.Equal(0, await CountAsync("inbox_attempts"));
         Assert.DoesNotContain(
             logs.Records,
-            x => x.Fields.GetValueOrDefault("DiagnosticCode") as string == "exception_classifier.failed"
+            x =>
+                x.Fields.GetValueOrDefault("DiagnosticCode") as string
+                == "exception_classifier.failed"
         );
         Assert.Equal(1, await CountAsync("inbox", "status = 'pending' AND attempt_count = 0"));
         _probe.Handle = (_, _, _) => Task.FromResult(InboxResult.Applied);
@@ -362,14 +411,19 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
             return InboxResult.Applied;
         };
         var logs = new LogCapture();
-        var host = HostFor(configure: h => h.ClassifyException = UnexpectedClassification, logs: logs);
+        var host = HostFor(
+            configure: h => h.ClassifyException = UnexpectedClassification,
+            logs: logs
+        );
         await SeedAsync(host, 1);
         await Assert.ThrowsAnyAsync<NpgsqlException>(() => ProcessAsync(host));
         Assert.Equal(0, await BusinessCountAsync());
         Assert.Equal(0, await CountAsync("inbox_attempts"));
         Assert.DoesNotContain(
             logs.Records,
-            x => x.Fields.GetValueOrDefault("DiagnosticCode") as string == "exception_classifier.failed"
+            x =>
+                x.Fields.GetValueOrDefault("DiagnosticCode") as string
+                == "exception_classifier.failed"
         );
         Assert.Equal(1, await CountAsync("inbox", "attempt_count = 0 AND status = 'pending'"));
         _probe.Handle = (_, _, _) => Task.FromResult(InboxResult.Applied);
@@ -380,7 +434,9 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task Commit_failure_is_verified_with_fresh_context_without_blind_callback_replay(bool committed)
+    public async Task Commit_failure_is_verified_with_fresh_context_without_blind_callback_replay(
+        bool committed
+    )
     {
         var failure = new CommitFailure(committed);
         var host = HostFor(interceptor: failure);
@@ -401,7 +457,9 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
     {
         var host = HostFor();
         await SeedAsync(host, long.MaxValue);
-        await SqlAsync($"UPDATE \"{_schema}\".consumer_state SET last_sequence = 9223372036854775806");
+        await SqlAsync(
+            $"UPDATE \"{_schema}\".consumer_state SET last_sequence = 9223372036854775806"
+        );
         Assert.True(await ProcessAsync(host));
         Assert.Single(_probe.Calls);
         await SeedAsync(host, 1);
@@ -409,13 +467,25 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         Assert.False(await ProcessAsync(host));
         Assert.Single(_probe.Calls);
         Assert.Equal(1, await CountAsync("inbox", "code = 'stale_sequence' AND attempt_count = 0"));
-        Assert.Equal(long.MaxValue, await ScalarAsync<long>($"SELECT last_sequence FROM \"{_schema}\".consumer_state"));
+        Assert.Equal(
+            long.MaxValue,
+            await ScalarAsync<long>($"SELECT last_sequence FROM \"{_schema}\".consumer_state")
+        );
     }
 
     [Fact]
     public async Task Live_transport_two_handlers_two_subscriptions_and_three_replicas_apply_once_in_order()
     {
-        var hosts = Enumerable.Range(0, 3).Select(_ => HostFor(dispatch: true, secondHandler: true, configure: h => h.StartupReorderWindow = TimeSpan.FromMilliseconds(100))).ToArray();
+        var hosts = Enumerable
+            .Range(0, 3)
+            .Select(_ =>
+                HostFor(
+                    dispatch: true,
+                    secondHandler: true,
+                    configure: h => h.StartupReorderWindow = TimeSpan.FromMilliseconds(100)
+                )
+            )
+            .ToArray();
         await Task.WhenAll(hosts.Select(h => h.StartAsync(Token)));
         foreach (var sequence in new long[] { 3, 1, 2 })
             (
@@ -432,14 +502,21 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         Assert.Equal(18, await BusinessCountAsync());
         foreach (var id in new[] { "locations", "products" })
         {
-            var committed = await ScalarAsync<string>($"SELECT json_agg(i.sequence ORDER BY j.id)::text " +
-                $"FROM \"{_schema}\".inbox_journal j JOIN \"{_schema}\".inbox i ON i.id = j.inbox_id " +
-                $"WHERE j.decision = 'processed' AND i.handler_id = '{id}'");
+            var committed = await ScalarAsync<string>(
+                $"SELECT json_agg(i.sequence ORDER BY j.id)::text "
+                    + $"FROM \"{_schema}\".inbox_journal j JOIN \"{_schema}\".inbox i ON i.id = j.inbox_id "
+                    + $"WHERE j.decision = 'processed' AND i.handler_id = '{id}'"
+            );
             using var json = JsonDocument.Parse(committed);
-            Assert.Equal(new long[] { 1, 2, 3 }, json.RootElement.EnumerateArray().Select(x => x.GetInt64()));
+            Assert.Equal(
+                new long[] { 1, 2, 3 },
+                json.RootElement.EnumerateArray().Select(x => x.GetInt64())
+            );
         }
         foreach (var id in new[] { "locations", "products", "locations-other", "products-other" })
-            await UntilAsync(async () => (await _js.GetConsumerAsync(_stream, id, Token)).Info.NumAckPending == 0);
+            await UntilAsync(async () =>
+                (await _js.GetConsumerAsync(_stream, id, Token)).Info.NumAckPending == 0
+            );
     }
 
     [Theory]
@@ -447,7 +524,9 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
     [InlineData("ignore")]
     [InlineData("retry")]
     [InlineData("reject")]
-    public async Task Business_diagnostics_are_committed_with_each_result_and_correlated_in_ILogger(string outcome)
+    public async Task Business_diagnostics_are_committed_with_each_result_and_correlated_in_ILogger(
+        string outcome
+    )
     {
         _probe.Diagnose = (diagnostics, _, _) =>
         {
@@ -478,7 +557,9 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
                     + "AND diagnostics -> 0 -> 'details' ->> 'profile_id' = '42'"
             )
         );
-        var attempt = await ScalarAsync<Guid>($"SELECT attempt_id FROM \"{_schema}\".inbox_attempts");
+        var attempt = await ScalarAsync<Guid>(
+            $"SELECT attempt_id FROM \"{_schema}\".inbox_attempts"
+        );
         var log = Assert.Single(logs.Records, x => x.Category == typeof(InboxDiagnostics).FullName);
         Assert.Equal(attempt, log.Fields["AttemptId"]);
         Assert.Equal("locations", log.Fields["HandlerId"]);
@@ -503,7 +584,10 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         await SeedAsync(host, 1);
         Assert.True(await ProcessAsync(host));
         Assert.DoesNotContain(logs.Records, x => x.Category == typeof(InboxDiagnostics).FullName);
-        Assert.Equal(1, await CountAsync("inbox_attempts", "diagnostics -> 0 ->> 'code' = 'projection.checked'"));
+        Assert.Equal(
+            1,
+            await CountAsync("inbox_attempts", "diagnostics -> 0 ->> 'code' = 'projection.checked'")
+        );
     }
 
     [Fact]
@@ -533,11 +617,15 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
                     + "AND a.diagnostics -> 0 -> 'details' ->> 'objectKey' = i.object_key"
             )
         );
-        var records = logs.Records.Where(x => x.Category == typeof(InboxDiagnostics).FullName).ToArray();
+        var records = logs
+            .Records.Where(x => x.Category == typeof(InboxDiagnostics).FullName)
+            .ToArray();
         Assert.Equal(2, records.Select(x => x.Fields["AttemptId"]).Distinct().Count());
         Assert.Equal(2, records.Select(x => x.Fields["InboxId"]).Distinct().Count());
         foreach (var scope in _probe.Scopes)
-            Assert.Throws<ObjectDisposedException>(() => scope.Write("late", "The operation scope is disposed."));
+            Assert.Throws<ObjectDisposedException>(() =>
+                scope.Write("late", "The operation scope is disposed.")
+            );
     }
 
     [Fact]
@@ -549,7 +637,10 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
             return Task.CompletedTask;
         };
         _probe.Handle = (_, _, _) =>
-            throw new InvalidOperationException("Business failed.", new ArgumentException("Inner error."));
+            throw new InvalidOperationException(
+                "Business failed.",
+                new ArgumentException("Inner error.")
+            );
         var host = HostFor(configure: h =>
         {
             h.Retry.MaxAttempts = 2;
@@ -583,7 +674,11 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
             {
                 using var details = JsonDocument.Parse("{\"field\":\"name\"}");
                 return error is ArgumentException
-                    ? InboxResult.Reject("Unsupported business value.", "invalid_value", details.RootElement)
+                    ? InboxResult.Reject(
+                        "Unsupported business value.",
+                        "invalid_value",
+                        details.RootElement
+                    )
                     : InboxResult.Retry("Unexpected error");
             };
         });
@@ -595,21 +690,17 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
                 "inbox_attempts",
                 "outcome = 'rejected' AND code = 'invalid_value' "
                     + "AND details ->> 'field' = 'name' AND exception LIKE '%Unsupported business value.%' "
-
             )
         );
-        Assert.Equal(
-            1,
-            await CountAsync("inbox_dlq", "code = 'invalid_value' AND exception LIKE '%ArgumentException%'")
-        );
-        Assert.Equal(0, await BusinessCountAsync());
         Assert.Equal(
             1,
             await CountAsync(
-                "consumer_state",
-                "last_sequence = 1"
+                "inbox_dlq",
+                "code = 'invalid_value' AND exception LIKE '%ArgumentException%'"
             )
         );
+        Assert.Equal(0, await BusinessCountAsync());
+        Assert.Equal(1, await CountAsync("consumer_state", "last_sequence = 1"));
     }
 
     [Theory]
@@ -655,7 +746,11 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         _probe.Diagnose = (diagnostics, _, _) =>
         {
             using var details = JsonDocument.Parse(raw);
-            diagnostics.Write("invalid_jsonb", "Keep original diagnostic JSON.", details.RootElement);
+            diagnostics.Write(
+                "invalid_jsonb",
+                "Keep original diagnostic JSON.",
+                details.RootElement
+            );
             return Task.CompletedTask;
         };
         _probe.Handle = (_, _, _) =>
@@ -666,11 +761,16 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         var host = HostFor();
         await SeedAsync(host, 1);
         Assert.True(await ProcessAsync(host));
-        var snapshot = await ScalarAsync<string>($"SELECT diagnostics::text FROM \"{_schema}\".inbox_attempts");
+        var snapshot = await ScalarAsync<string>(
+            $"SELECT diagnostics::text FROM \"{_schema}\".inbox_attempts"
+        );
         using var json = JsonDocument.Parse(snapshot);
         var entry = Assert.Single(json.RootElement.EnumerateArray());
         Assert.Equal("diagnostics.invalid_jsonb", entry.GetProperty("code").GetString());
-        Assert.Equal(1, await CountAsync("inbox_attempts", "details ->> 'code' = 'diagnostics.invalid_jsonb'"));
+        Assert.Equal(
+            1,
+            await CountAsync("inbox_attempts", "details ->> 'code' = 'diagnostics.invalid_jsonb'")
+        );
         Assert.Equal(1, await CountAsync("inbox", "status = 'skipped' AND attempt_count = 1"));
         Assert.Equal(1, await CountAsync("consumer_state", "last_sequence = 1"));
     }
@@ -711,7 +811,13 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         await SeedAsync(host, 1);
         Assert.True(await ProcessAsync(host));
         Assert.Equal(1, await CountAsync("inbox", "status = 'processed'"));
-        Assert.Equal(1, await CountAsync("inbox_attempts", "diagnostics -> -1 ->> 'code' = 'diagnostics.truncated'"));
+        Assert.Equal(
+            1,
+            await CountAsync(
+                "inbox_attempts",
+                "diagnostics -> -1 ->> 'code' = 'diagnostics.truncated'"
+            )
+        );
         Assert.Equal(3, await BusinessCountAsync());
     }
 
@@ -777,7 +883,9 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         }
         if (!dispatch)
             builder.Services.Remove(
-                builder.Services.Single(d => d.ImplementationType == typeof(InboxDispatcher<TestDb>))
+                builder.Services.Single(d =>
+                    d.ImplementationType == typeof(InboxDispatcher<TestDb>)
+                )
             );
         configureServices?.Invoke(builder.Services);
         var host = builder.Build();
@@ -785,7 +893,12 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         return host;
     }
 
-    private async Task SeedAsync(IHost host, long sequence, string key = "object-1", string subscription = "events")
+    private async Task SeedAsync(
+        IHost host,
+        long sequence,
+        string key = "object-1",
+        string subscription = "events"
+    )
     {
         var handler = host
             .Services.GetRequiredService<InboxCatalog<TestDb>>()
@@ -833,7 +946,8 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
             }
         );
 
-    private Task<long> BusinessCountAsync() => ScalarAsync<long>("SELECT count(*) FROM public.processing_business");
+    private Task<long> BusinessCountAsync() =>
+        ScalarAsync<long>("SELECT count(*) FROM public.processing_business");
 
     private Task<long> CountAsync(string table, string condition = "true") =>
         ScalarAsync<long>($"SELECT count(*) FROM \"{_schema}\".{table} WHERE {condition}");
@@ -859,19 +973,31 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         var timer = Stopwatch.StartNew();
         while (!await ready())
         {
-            Assert.True(timer.Elapsed < TimeSpan.FromSeconds(10), "Timed out waiting for inbox processing.");
+            Assert.True(
+                timer.Elapsed < TimeSpan.FromSeconds(10),
+                "Timed out waiting for inbox processing."
+            );
             await Task.Delay(20, Token);
         }
     }
 
     private sealed class Probe
     {
-        internal readonly ConcurrentQueue<(string Handler, string Key, long Sequence)> Calls = new();
+        internal readonly ConcurrentQueue<(string Handler, string Key, long Sequence)> Calls =
+            new();
         internal readonly ConcurrentQueue<InboxDiagnostics> Scopes = new();
-        internal Func<InboxDiagnostics, JsonElement, CancellationToken, Task> Diagnose { get; set; } =
-            (_, _, _) => Task.CompletedTask;
-        internal Func<TestDb, JsonElement, CancellationToken, Task<InboxResult>> Handle { get; set; } =
-            (_, _, _) => Task.FromResult(InboxResult.Applied);
+        internal Func<
+            InboxDiagnostics,
+            JsonElement,
+            CancellationToken,
+            Task
+        > Diagnose { get; set; } = (_, _, _) => Task.CompletedTask;
+        internal Func<
+            TestDb,
+            JsonElement,
+            CancellationToken,
+            Task<InboxResult>
+        > Handle { get; set; } = (_, _, _) => Task.FromResult(InboxResult.Applied);
     }
 
     private sealed class Dependency(TestDb context, InboxDiagnostics diagnostics)
@@ -888,7 +1014,11 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         string handler
     ) : IInboxHandler<TestDb>
     {
-        public async Task<InboxResult> HandleAsync(TestDb db, JsonElement message, CancellationToken ct)
+        public async Task<InboxResult> HandleAsync(
+            TestDb db,
+            JsonElement message,
+            CancellationToken ct
+        )
         {
             Assert.Same(db, scopedDb);
             Assert.Same(db, dependency.Context);
@@ -935,11 +1065,19 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         }
     }
 
-    private sealed class LocationsHandler(TestDb db, Dependency dependency, Probe probe, InboxDiagnostics diagnostics)
-        : Handler(db, dependency, probe, diagnostics, "locations");
+    private sealed class LocationsHandler(
+        TestDb db,
+        Dependency dependency,
+        Probe probe,
+        InboxDiagnostics diagnostics
+    ) : Handler(db, dependency, probe, diagnostics, "locations");
 
-    private sealed class ProductsHandler(TestDb db, Dependency dependency, Probe probe, InboxDiagnostics diagnostics)
-        : Handler(db, dependency, probe, diagnostics, "products");
+    private sealed class ProductsHandler(
+        TestDb db,
+        Dependency dependency,
+        Probe probe,
+        InboxDiagnostics diagnostics
+    ) : Handler(db, dependency, probe, diagnostics, "products");
 
     private sealed class TestDb(DbContextOptions<TestDb> options) : DbContext(options)
     {
@@ -962,7 +1100,8 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
         internal readonly ConcurrentQueue<LogRecord> Records = new();
         private IExternalScopeProvider _scopes = new LoggerExternalScopeProvider();
 
-        public void SetScopeProvider(IExternalScopeProvider scopeProvider) => _scopes = scopeProvider;
+        public void SetScopeProvider(IExternalScopeProvider scopeProvider) =>
+            _scopes = scopeProvider;
 
         public ILogger CreateLogger(string categoryName) => new CaptureLogger(this, categoryName);
 
@@ -1029,7 +1168,9 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
             if (Armed && afterCommit)
             {
                 Armed = false;
-                throw new IOException("Simulated lost COMMIT acknowledgement after PostgreSQL committed.");
+                throw new IOException(
+                    "Simulated lost COMMIT acknowledgement after PostgreSQL committed."
+                );
             }
             return Task.CompletedTask;
         }

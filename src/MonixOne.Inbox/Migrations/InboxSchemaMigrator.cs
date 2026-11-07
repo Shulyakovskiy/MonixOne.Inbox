@@ -37,13 +37,22 @@ internal static class InboxSchemaMigrator
                 // Schema is already validated as an ASCII identifier. All other values are parameters.
                 var quotedSchema = $"\"{schema}\"";
                 // Use the server's database name: different PgBouncer aliases may point to the same database.
-                var database = await data.SelectAsync(() => InboxPostgreSql.CurrentDatabase(), token);
+                var database = await data.SelectAsync(
+                    () => InboxPostgreSql.CurrentDatabase(),
+                    token
+                );
                 var lockKey = LockKey(database, schema);
                 logger.LogDebug("Waiting for OrderedInbox schema lock in {Schema}.", schema);
-                await data.SelectAsync(() => InboxPostgreSql.AdvisoryTransactionLock(lockKey), token);
+                await data.SelectAsync(
+                    () => InboxPostgreSql.AdvisoryTransactionLock(lockKey),
+                    token
+                );
 
                 var historyName = $"{quotedSchema}.schema_migrations";
-                var historyExists = await data.SelectAsync(() => InboxPostgreSql.RelationExists(historyName), token);
+                var historyExists = await data.SelectAsync(
+                    () => InboxPostgreSql.RelationExists(historyName),
+                    token
+                );
                 if (!historyExists)
                 {
                     if (!autoMigrate)
@@ -76,7 +85,9 @@ internal static class InboxSchemaMigrator
                     .OrderBy(m => m.Version)
                     .ToListAsyncLinqToDB(token);
                 ValidateHistory(history, schema);
-                var pending = InboxMigration.All.Where(m => history.All(h => h.Version != m.Version)).ToArray();
+                var pending = InboxMigration
+                    .All.Where(m => history.All(h => h.Version != m.Version))
+                    .ToArray();
                 foreach (var migration in pending)
                 {
                     if (!autoMigrate)
@@ -148,15 +159,14 @@ internal static class InboxSchemaMigrator
                 );
 
             if (applied.Version > InboxMigration.All[^1].Version)
-                throw new InvalidOperationException($"OrderedInbox schema '{schema}' has a newer migration version.");
+                throw new InvalidOperationException(
+                    $"OrderedInbox schema '{schema}' has a newer migration version."
+                );
 
             var known = InboxMigration.All.FirstOrDefault(m => m.Version == applied.Version);
             if (
                 known is not null
-                && (
-                    applied.Name != known.Name
-                    || applied.Checksum != known.Checksum
-                )
+                && (applied.Name != known.Name || applied.Checksum != known.Checksum)
             )
                 throw new InvalidOperationException(
                     $"OrderedInbox migration {applied.Version} in schema '{schema}' differs from the "

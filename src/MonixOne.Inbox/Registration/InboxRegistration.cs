@@ -66,4 +66,8 @@ internal sealed record HandlerDescriptor<TDbContext>(
 /// <param name="Configure">
 /// Последний уровень транспортных overrides; бизнес-параметры не меняет.
 /// </param>
-internal sealed record SubscriptionDescriptor(string HandlerId, string Id, Action<InboxSubscriptionOptions> Configure);
+internal sealed record SubscriptionDescriptor(
+    string HandlerId,
+    string Id,
+    Action<InboxSubscriptionOptions> Configure
+);

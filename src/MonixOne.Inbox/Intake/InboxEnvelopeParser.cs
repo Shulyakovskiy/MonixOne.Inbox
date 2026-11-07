@@ -43,7 +43,14 @@ internal static class InboxEnvelopeParser
 
             var utc = metadata.OccurredAt.ToUniversalTime();
             // PostgreSQL timestamptz stores microseconds; compare using the same precision.
-            return new(json, metadata with { OccurredAt = new(utc.Ticks - utc.Ticks % 10, TimeSpan.Zero) }, null);
+            return new(
+                json,
+                metadata with
+                {
+                    OccurredAt = new(utc.Ticks - utc.Ticks % 10, TimeSpan.Zero),
+                },
+                null
+            );
         }
         catch (Exception error)
         {
@@ -53,14 +60,23 @@ internal static class InboxEnvelopeParser
     }
 
     internal static bool ValidText(string? value, int bytes) =>
-        !string.IsNullOrWhiteSpace(value) && !value.Contains('\0') && Encoding.UTF8.GetByteCount(value) <= bytes;
+        !string.IsNullOrWhiteSpace(value)
+        && !value.Contains('\0')
+        && Encoding.UTF8.GetByteCount(value) <= bytes;
 
     private static DateTimeOffset OccurredAt(JsonElement root, string path)
     {
         var value = At(root, path);
         var text = value.GetString() ?? throw new FormatException("Expected an ISO timestamp.");
         var time = text.IndexOf('T');
-        if (time < 0 || !(text.EndsWith('Z') || text.AsSpan(time).Contains('+') || text.AsSpan(time).Contains('-')))
+        if (
+            time < 0
+            || !(
+                text.EndsWith('Z')
+                || text.AsSpan(time).Contains('+')
+                || text.AsSpan(time).Contains('-')
+            )
+        )
             throw new FormatException("Timestamp must have an explicit UTC offset.");
         return value.GetDateTimeOffset();
     }

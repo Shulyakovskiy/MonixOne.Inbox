@@ -7,15 +7,19 @@ namespace MonixOne.Inbox.Migrations;
 internal sealed record InboxMigration(int Version, string Name, string Sql, string Checksum)
 {
     internal static IReadOnlyList<InboxMigration> All { get; } =
-        [Load(1, "initial"), Load(2, "state_metrics"), Load(3, "optimistic_processing")];
+    [Load(1, "initial"), Load(2, "state_metrics"), Load(3, "optimistic_processing")];
     internal static InboxMigration Initial => All[0];
 
     private static InboxMigration Load(int version, string name)
     {
         var assembly = typeof(InboxMigration).Assembly;
         using var stream =
-            assembly.GetManifestResourceStream($"MonixOne.Inbox.Migrations.{version:000}_{name}.sql")
-            ?? throw new InvalidOperationException($"Missing embedded OrderedInbox migration {version}/{name}.");
+            assembly.GetManifestResourceStream(
+                $"MonixOne.Inbox.Migrations.{version:000}_{name}.sql"
+            )
+            ?? throw new InvalidOperationException(
+                $"Missing embedded OrderedInbox migration {version}/{name}."
+            );
         using var reader = new StreamReader(stream, Encoding.UTF8);
         // Git/editor line-ending conversion must not change an already installed migration's checksum.
         var sql = reader.ReadToEnd().Replace("\r\n", "\n", StringComparison.Ordinal);

@@ -34,20 +34,33 @@ internal sealed class InboxCatalog<TDbContext>
         foreach (var configure in registration.Configure)
             configure(configuration);
 
-        Settings = new(configuration.Schema ?? "ordered_inbox", configuration.AutoMigrate ?? true,
-            InboxCleanupSettings.Defaults.Apply(configuration.HistoryCleanup));
+        Settings = new(
+            configuration.Schema ?? "ordered_inbox",
+            configuration.AutoMigrate ?? true,
+            InboxCleanupSettings.Defaults.Apply(configuration.HistoryCleanup)
+        );
         var handlers = ImmutableArray.CreateBuilder<InboxHandlerRegistration<TDbContext>>();
         var errors = new List<string>();
         CheckKnownHandlers(configuration, registration, errors);
 
         foreach (var descriptor in registration.Handlers)
         {
-            var local = configuration.Handlers.GetValueOrDefault(descriptor.Id) ?? new InboxHandlerOptions();
+            var local =
+                configuration.Handlers.GetValueOrDefault(descriptor.Id)
+                ?? new InboxHandlerOptions();
             descriptor.Configure?.Invoke(local);
-            var processing = InboxProcessingSettings.Defaults.Apply(configuration.Defaults).Apply(local);
-            var subscriptions = new Dictionary<string, InboxSubscriptionSettings>(StringComparer.Ordinal);
+            var processing = InboxProcessingSettings
+                .Defaults.Apply(configuration.Defaults)
+                .Apply(local);
+            var subscriptions = new Dictionary<string, InboxSubscriptionSettings>(
+                StringComparer.Ordinal
+            );
             ApplySubscriptions(subscriptions, local);
-            foreach (var subscription in registration.Subscriptions.Where(s => s.HandlerId == descriptor.Id))
+            foreach (
+                var subscription in registration.Subscriptions.Where(s =>
+                    s.HandlerId == descriptor.Id
+                )
+            )
             {
                 var options = new InboxSubscriptionOptions();
                 subscription.Configure(options);
@@ -68,12 +81,18 @@ internal sealed class InboxCatalog<TDbContext>
 
         foreach (var subscription in registration.Subscriptions)
             if (registration.Handlers.All(h => h.Id != subscription.HandlerId))
-                errors.Add($"Subscription '{subscription.HandlerId}/{subscription.Id}' references an unknown handler.");
+                errors.Add(
+                    $"Subscription '{subscription.HandlerId}/{subscription.Id}' references an unknown handler."
+                );
 
         Handlers = handlers.ToImmutable();
         InboxSettingsValidator.Validate(Settings, Handlers, services, provider, errors);
         if (errors.Count > 0)
-            throw new OptionsValidationException("OrderedInbox", typeof(OrderedInboxOptions), errors);
+            throw new OptionsValidationException(
+                "OrderedInbox",
+                typeof(OrderedInboxOptions),
+                errors
+            );
     }
 
     internal InboxSettings Settings { get; }
@@ -90,7 +109,9 @@ internal sealed class InboxCatalog<TDbContext>
 
         foreach (var handlerId in options.Handlers.Keys)
             if (registration.Handlers.All(h => h.Id != handlerId))
-                errors.Add($"Settings reference unknown handler '{handlerId}'. Register its C# handler explicitly.");
+                errors.Add(
+                    $"Settings reference unknown handler '{handlerId}'. Register its C# handler explicitly."
+                );
     }
 
     private static void ApplySubscriptions(

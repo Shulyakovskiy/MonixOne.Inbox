@@ -31,7 +31,8 @@ public sealed class OrderedInboxOptions
     /// Настройки по стабильному handler_id. Каждый handler отдельно хранит cursor и inbox.
     /// C#-обработчик для каждого id необходимо зарегистрировать через AddHandler.
     /// </summary>
-    public Dictionary<string, InboxHandlerOptions> Handlers { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, InboxHandlerOptions> Handlers { get; set; } =
+        new(StringComparer.Ordinal);
 }
 
 /// <summary>
@@ -98,7 +99,8 @@ public sealed class InboxHandlerOptions : InboxProcessingOptions
     /// Подписки по стабильному subscription_id. Нужна хотя бы одна для активного handler.
     /// Несколько подписок одного handler используют общий cursor по ключу производителя.
     /// </summary>
-    public Dictionary<string, InboxSubscriptionOptions> Subscriptions { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, InboxSubscriptionOptions> Subscriptions { get; set; } =
+        new(StringComparer.Ordinal);
 
     /// <summary>
     /// Добавляет или обновляет подписку с обязательными транспортными параметрами.
@@ -128,7 +130,8 @@ public sealed class InboxHandlerOptions : InboxProcessingOptions
     )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(subscriptionId);
-        var subscription = Subscriptions.GetValueOrDefault(subscriptionId) ?? new InboxSubscriptionOptions();
+        var subscription =
+            Subscriptions.GetValueOrDefault(subscriptionId) ?? new InboxSubscriptionOptions();
         subscription.Stream = stream;
         subscription.Subject = subject;
         subscription.DurableName = durableName;
@@ -202,12 +205,16 @@ public sealed class InboxHistoryCleanupOptions
 {
     /// <summary>Запускать фоновую очистку. Default: true.</summary>
     public bool? Enabled { get; set; }
+
     /// <summary>Хранить processed/skipped. Default: 30 дней.</summary>
     public TimeSpan? CompletedRetention { get; set; }
+
     /// <summary>Хранить DLQ и необходимую исходную историю. Default: 90 дней.</summary>
     public TimeSpan? DeadLetterRetention { get; set; }
+
     /// <summary>Период очистки. Default: 1 час.</summary>
     public TimeSpan? Interval { get; set; }
+
     /// <summary>Максимум событий или DLQ в одной короткой транзакции. Default: 500.</summary>
     public int? BatchSize { get; set; }
 }

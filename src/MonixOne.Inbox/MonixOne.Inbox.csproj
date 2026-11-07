@@ -2,7 +2,7 @@
   <PropertyGroup>
     <Title>MonixOne.Inbox</Title>
     <Description>Ordered inbox for .NET 10, EF Core, PostgreSQL and NATS JetStream with transactional handlers, per-key ordering, deduplication, retries and dead-letter storage.</Description>
-    <Version>1.1.1</Version>
+    <Version>1.1.2</Version>
     <IsPackable>true</IsPackable>
     <PackageId>MonixOne.Inbox</PackageId>
     <Authors>Shulyakovsky.E</Authors>
@@ -13,7 +13,7 @@
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageTags>dotnet;inbox;PostgreSQL;NATS;JetStream;EFCore;ordered;idempotency;retry;DLQ</PackageTags>
-    <PackageReleaseNotes>Add the package icon, MIT license metadata, project and source repository links.</PackageReleaseNotes>
+    <PackageReleaseNotes>Use camelCase event envelope metadata consistently in the default parser and serialized contracts.</PackageReleaseNotes>
     <PackageIcon>nuget-icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <_InboxPackageReadmePath>$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/nuget/README.md</_InboxPackageReadmePath>
@@ -43,8 +43,11 @@
     <None Include="../../docs/event-processing.svg" Pack="true" PackagePath="docs/" />
   </ItemGroup>
   <!-- NuGet.org требует абсолютные URL изображений; локальный README сохраняет относительные ссылки. -->
-  <UsingTask TaskName="WriteInboxPackageReadme" TaskFactory="RoslynCodeTaskFactory"
-             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+  <UsingTask
+    TaskName="WriteInboxPackageReadme"
+    TaskFactory="RoslynCodeTaskFactory"
+    AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll"
+  >
     <ParameterGroup>
       <SourceFile ParameterType="System.String" Required="true" />
       <DestinationFile ParameterType="System.String" Required="true" />
@@ -52,7 +55,8 @@
     </ParameterGroup>
     <Task>
       <Using Namespace="System.IO" />
-      <Code Type="Fragment" Language="cs"><![CDATA[
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
         // File IO preserves backslashes in JSON examples; MSBuild item values may normalize them as paths.
         var content = File.ReadAllText(SourceFile)
             .Replace("(docs/event-processing.png)", "(" + ImageBaseUrl + "event-processing.png)")
@@ -61,12 +65,15 @@
         Directory.CreateDirectory(Path.GetDirectoryName(destination));
         if (!File.Exists(destination) || File.ReadAllText(destination) != content)
             File.WriteAllText(destination, content, new System.Text.UTF8Encoding(false));
-      ]]></Code>
+      ]]>
+      </Code>
     </Task>
   </UsingTask>
   <Target Name="PrepareInboxPackageReadme" BeforeTargets="_GetPackageFiles">
-    <WriteInboxPackageReadme SourceFile="$(MSBuildThisFileDirectory)../../README.md"
-                             DestinationFile="$(_InboxPackageReadmePath)"
-                             ImageBaseUrl="https://raw.githubusercontent.com/Shulyakovskiy/MonixOne.Inbox/main/docs/" />
+    <WriteInboxPackageReadme
+      SourceFile="$(MSBuildThisFileDirectory)../../README.md"
+      DestinationFile="$(_InboxPackageReadmePath)"
+      ImageBaseUrl="https://raw.githubusercontent.com/Shulyakovskiy/MonixOne.Inbox/main/docs/"
+    />
   </Target>
 </Project>

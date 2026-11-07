@@ -40,7 +40,10 @@ internal sealed class InboxIntakeStore<TDbContext>(
         CancellationToken token
     )
     {
-        var parsed = InboxEnvelopeParser.Parse(delivery.Raw, services.GetService<IInboxEnvelopeAdapter>());
+        var parsed = InboxEnvelopeParser.Parse(
+            delivery.Raw,
+            services.GetService<IInboxEnvelopeAdapter>()
+        );
         // Only durable, idempotent intake is retried here. No NATS ACK or business callback is in this delegate.
         var decision = await context
             .Database.CreateExecutionStrategy()
@@ -69,7 +72,9 @@ internal sealed class InboxIntakeStore<TDbContext>(
 
                     // One receipt path for accepted, duplicate, invalid and conflicting messages.
                     // A cross-key conflict links every original; invalid messages have no inbox id.
-                    foreach (var inboxId in result.InboxIds.Select(id => (Guid?)id).DefaultIfEmpty())
+                    foreach (
+                        var inboxId in result.InboxIds.Select(id => (Guid?)id).DefaultIfEmpty()
+                    )
                         await data.InsertAsync(
                             new InboxJournalRow
                             {
@@ -105,7 +110,15 @@ internal sealed class InboxIntakeStore<TDbContext>(
     )
     {
         if (parsed.Metadata is not null)
-            return await SaveValidAsync(data, handler, subscription, delivery, worker, parsed, token);
+            return await SaveValidAsync(
+                data,
+                handler,
+                subscription,
+                delivery,
+                worker,
+                parsed,
+                token
+            );
         var dlq = await SaveDlqAsync(
             data,
             handler,
@@ -135,49 +148,78 @@ internal sealed class InboxIntakeStore<TDbContext>(
         var metadata = parsed.Metadata!;
         var rows = data.GetTable<InboxRow>().SchemaName(schema);
         // Existing keys are read without touching their row. An insert race is handled by uniqueness.
-        if (!await data.GetTable<InboxStateRow>().SchemaName(schema).AnyAsyncLinqToDB(x =>
-            x.HandlerId == handler.Id && x.Producer == metadata.Producer &&
-            x.SequenceScope == metadata.SequenceScope && x.ObjectKey == metadata.ObjectKey, token))
+        if (
+            !await data.GetTable<InboxStateRow>()
+                .SchemaName(schema)
+                .AnyAsyncLinqToDB(
+                    x =>
+                        x.HandlerId == handler.Id
+                        && x.Producer == metadata.Producer
+                        && x.SequenceScope == metadata.SequenceScope
+                        && x.ObjectKey == metadata.ObjectKey,
+                    token
+                )
+        )
         {
             data.NextQueryHints.Add("ON CONFLICT DO NOTHING");
-            await data.InsertAsync(new InboxStateRow
-            {
-                HandlerId = handler.Id,
-                Producer = metadata.Producer,
-                SequenceScope = metadata.SequenceScope,
-                ObjectKey = metadata.ObjectKey,
-            }, schemaName: schema, token: token);
+            await data.InsertAsync(
+                new InboxStateRow
+                {
+                    HandlerId = handler.Id,
+                    Producer = metadata.Producer,
+                    SequenceScope = metadata.SequenceScope,
+                    ObjectKey = metadata.ObjectKey,
+                },
+                schemaName: schema,
+                token: token
+            );
         }
 
         var id = Guid.NewGuid();
         data.NextQueryHints.Add("ON CONFLICT DO NOTHING");
-        var inserted = await data.InsertAsync(new InboxRow
-        {
-            Id = id,
-            HandlerId = handler.Id,
-            SubscriptionId = subscription.Id,
-            EventId = metadata.EventId,
-            Producer = metadata.Producer,
-            SequenceScope = metadata.SequenceScope,
-            ObjectKey = metadata.ObjectKey,
-            Sequence = metadata.Sequence,
-            EventType = metadata.EventType,
-            OccurredAt = metadata.OccurredAt,
-            Envelope = parsed.Json!,
-            RawPayload = delivery.Raw,
-            Source = delivery.Source,
-            RunId = Guid.NewGuid(),
-        }, schemaName: schema, token: token);
+        var inserted = await data.InsertAsync(
+            new InboxRow
+            {
+                Id = id,
+                HandlerId = handler.Id,
+                SubscriptionId = subscription.Id,
+                EventId = metadata.EventId,
+                Producer = metadata.Producer,
+                SequenceScope = metadata.SequenceScope,
+                ObjectKey = metadata.ObjectKey,
+                Sequence = metadata.Sequence,
+                EventType = metadata.EventType,
+                OccurredAt = metadata.OccurredAt,
+                Envelope = parsed.Json!,
+                RawPayload = delivery.Raw,
+                Source = delivery.Source,
+                RunId = Guid.NewGuid(),
+            },
+            schemaName: schema,
+            token: token
+        );
         if (inserted == 1)
             return new("received", [id], null);
 
         // A new statement sees the unique-index winner under ReadCommitted.
-        var originals = await rows.Where(x => x.HandlerId == handler.Id &&
-            (x.EventId == metadata.EventId || (x.Producer == metadata.Producer &&
-                x.SequenceScope == metadata.SequenceScope && x.ObjectKey == metadata.ObjectKey &&
-                x.Sequence == metadata.Sequence))).OrderBy(x => x.Id).ToListAsyncLinqToDB(token);
+        var originals = await rows.Where(x =>
+                x.HandlerId == handler.Id
+                && (
+                    x.EventId == metadata.EventId
+                    || (
+                        x.Producer == metadata.Producer
+                        && x.SequenceScope == metadata.SequenceScope
+                        && x.ObjectKey == metadata.ObjectKey
+                        && x.Sequence == metadata.Sequence
+                    )
+                )
+            )
+            .OrderBy(x => x.Id)
+            .ToListAsyncLinqToDB(token);
         if (originals.Count == 0)
-            throw new InvalidOperationException("Intake identity changed during cleanup; redelivery must retry.");
+            throw new InvalidOperationException(
+                "Intake identity changed during cleanup; redelivery must retry."
+            );
 
         if (
             originals.Count == 1
@@ -222,7 +264,9 @@ internal sealed class InboxIntakeStore<TDbContext>(
     )
     {
         var schema = catalog.Settings.Schema;
-        var dedup = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(delivery.Identity)));
+        var dedup = Convert.ToHexStringLower(
+            SHA256.HashData(Encoding.UTF8.GetBytes(delivery.Identity))
+        );
         var existing = await data.GetTable<InboxDlqRow>()
             .SchemaName(schema)
             .Where(x => x.HandlerId == handler.Id && x.DeduplicationKey == dedup)
@@ -258,9 +302,11 @@ internal sealed class InboxIntakeStore<TDbContext>(
         if (await data.InsertAsync(row, schemaName: schema, token: token) == 1)
             return row.Id;
         // ReadCommitted sees the winning delivery in a separate statement after an insert race.
-        return await data.GetTable<InboxDlqRow>().SchemaName(schema)
+        return await data.GetTable<InboxDlqRow>()
+            .SchemaName(schema)
             .Where(x => x.HandlerId == handler.Id && x.DeduplicationKey == dedup)
-            .Select(x => x.Id).SingleAsyncLinqToDB(token);
+            .Select(x => x.Id)
+            .SingleAsyncLinqToDB(token);
     }
 
     private static async Task<ParsedInboxEvent> ValidateJsonAsync(
@@ -282,7 +328,8 @@ internal sealed class InboxIntakeStore<TDbContext>(
             await transaction.ReleaseSavepointAsync("envelope", token);
             return parsed;
         }
-        catch (PostgresException error) when (error.SqlState.StartsWith("22", StringComparison.Ordinal))
+        catch (PostgresException error)
+            when (error.SqlState.StartsWith("22", StringComparison.Ordinal))
         {
             await transaction.RollbackToSavepointAsync("envelope", token);
             return new(null, null, $"Envelope cannot be stored as jsonb ({error.SqlState}).");
