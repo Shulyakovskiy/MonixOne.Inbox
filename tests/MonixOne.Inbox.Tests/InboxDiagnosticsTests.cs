@@ -21,7 +21,9 @@ public sealed class InboxDiagnosticsTests
         Assert.Equal(42, entry.GetProperty("details").GetProperty("profile_id").GetInt32());
         Assert.Equal("Information", entry.GetProperty("level").GetString());
         Assert.Null(diagnostics.AttemptId);
-        Assert.Throws<InvalidOperationException>(() => diagnostics.Write("late", "No active attempt."));
+        Assert.Throws<InvalidOperationException>(() =>
+            diagnostics.Write("late", "No active attempt.")
+        );
     }
 
     [Fact]
@@ -32,8 +34,14 @@ public sealed class InboxDiagnosticsTests
         var raw = string.Concat(Enumerable.Repeat("{\"nested\":", 64)) + "42" + new string('}', 64);
         using var document = JsonDocument.Parse(raw);
         diagnostics.Write("deep", "Keep full diagnostic details.", document.RootElement);
-        using var snapshot = JsonDocument.Parse(diagnostics.Complete(), new JsonDocumentOptions { MaxDepth = 128 });
-        Assert.Equal("diagnostics.invalid_or_oversized", snapshot.RootElement[0].GetProperty("details").GetProperty("code").GetString());
+        using var snapshot = JsonDocument.Parse(
+            diagnostics.Complete(),
+            new JsonDocumentOptions { MaxDepth = 128 }
+        );
+        Assert.Equal(
+            "diagnostics.invalid_or_oversized",
+            snapshot.RootElement[0].GetProperty("details").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -49,7 +57,10 @@ public sealed class InboxDiagnosticsTests
         var entries = snapshot.RootElement.EnumerateArray().ToArray();
         Assert.InRange(entries.Length, 2, InboxDiagnostics.MaxEntries);
         Assert.Equal("diagnostics.truncated", entries[^1].GetProperty("code").GetString());
-        Assert.Equal(500L, entries.Length - 1 + entries[^1].GetProperty("droppedEntries").GetInt64());
+        Assert.Equal(
+            500L,
+            entries.Length - 1 + entries[^1].GetProperty("droppedEntries").GetInt64()
+        );
     }
 
     [Fact]
@@ -80,7 +91,10 @@ public sealed class InboxDiagnosticsTests
                 )
         );
         using var snapshot = JsonDocument.Parse(diagnostics.Complete());
-        var codes = snapshot.RootElement.EnumerateArray().Select(x => x.GetProperty("code").GetString()).ToArray();
+        var codes = snapshot
+            .RootElement.EnumerateArray()
+            .Select(x => x.GetProperty("code").GetString())
+            .ToArray();
         Assert.Equal(32, codes.Distinct().Count());
     }
 
@@ -90,7 +104,9 @@ public sealed class InboxDiagnosticsTests
         var diagnostics = new InboxDiagnostics(NullLogger<InboxDiagnostics>.Instance);
         Assert.Throws<InvalidOperationException>(() => diagnostics.Write("outside", "No attempt."));
         diagnostics.Begin(Guid.NewGuid());
-        Assert.Throws<ArgumentOutOfRangeException>(() => diagnostics.Write("none", "Message", level: LogLevel.None));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            diagnostics.Write("none", "Message", level: LogLevel.None)
+        );
         Assert.Throws<ArgumentException>(() => diagnostics.Write(" ", "Message"));
         diagnostics.Dispose();
         Assert.Null(diagnostics.AttemptId);

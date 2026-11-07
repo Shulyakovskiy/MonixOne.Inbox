@@ -182,14 +182,20 @@ public sealed class RegistrationTests
     [Fact]
     public async Task Code_subscription_updates_configured_transport_without_resetting_batch_size()
     {
-        var configuration = JsonConfiguration("""
+        var configuration = JsonConfiguration(
+            """
             { "Handlers": { "locations": { "Subscriptions": { "events": {
                 "Stream": "ORIGINAL", "Subject": "old.>", "DurableName": "original", "BatchSize": 17
             } } } } }
-            """);
+            """
+        );
         var services = CreateServices();
-        services.AddOrderedInbox<TestDb>(configuration).AddHandler<TestHandler>("locations", h =>
-            h.Subscribe("events", "EVENTS", "events.>", "locations"));
+        services
+            .AddOrderedInbox<TestDb>(configuration)
+            .AddHandler<TestHandler>(
+                "locations",
+                h => h.Subscribe("events", "EVENTS", "events.>", "locations")
+            );
         await using var provider = BuildProvider(services);
         var subscription = Assert.Single(Assert.Single(Catalog(provider).Handlers).Subscriptions);
         Assert.Equal("EVENTS", subscription.Stream);
@@ -202,8 +208,12 @@ public sealed class RegistrationTests
     public async Task Repeated_registration_adds_handlers_and_only_one_startup_service()
     {
         var services = CreateServices();
-        services.AddOrderedInbox<TestDb>().AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
-        services.AddOrderedInbox<TestDb>().AddHandler<TestHandler>("products", h => Subscribe(h, "products"));
+        services
+            .AddOrderedInbox<TestDb>()
+            .AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
+        services
+            .AddOrderedInbox<TestDb>()
+            .AddHandler<TestHandler>("products", h => Subscribe(h, "products"));
         Assert.Equal(5, services.Count(d => d.ServiceType == typeof(IHostedService)));
 
         await using var provider = BuildProvider(services);
@@ -215,7 +225,9 @@ public sealed class RegistrationTests
     public async Task Extra_subscription_from_another_registration_belongs_to_the_existing_handler()
     {
         var services = CreateServices();
-        services.AddOrderedInbox<TestDb>().AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
+        services
+            .AddOrderedInbox<TestDb>()
+            .AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
         services
             .AddOrderedInbox<TestDb>()
             .AddSubscription(
@@ -269,8 +281,12 @@ public sealed class RegistrationTests
     [Fact]
     public void Duplicate_explicit_subscription_is_rejected()
     {
-        var inbox = CreateServices().AddOrderedInbox<TestDb>().AddSubscription("locations", "events", _ => { });
-        Assert.Throws<ArgumentException>(() => inbox.AddSubscription("locations", "Events", _ => { }));
+        var inbox = CreateServices()
+            .AddOrderedInbox<TestDb>()
+            .AddSubscription("locations", "events", _ => { });
+        Assert.Throws<ArgumentException>(() =>
+            inbox.AddSubscription("locations", "Events", _ => { })
+        );
     }
 
     [Fact]
@@ -308,7 +324,10 @@ public sealed class RegistrationTests
             .AddSubscription("typo", "events", _ => { });
 
         await using var provider = BuildProvider(services);
-        Assert.Contains("unknown handler", Assert.Throws<OptionsValidationException>(() => Catalog(provider)).Message);
+        Assert.Contains(
+            "unknown handler",
+            Assert.Throws<OptionsValidationException>(() => Catalog(provider)).Message
+        );
     }
 
     [Theory]
@@ -334,7 +353,10 @@ public sealed class RegistrationTests
             );
 
         await using var provider = BuildProvider(services);
-        Assert.Contains("Subject", Assert.Throws<OptionsValidationException>(() => Catalog(provider)).Message);
+        Assert.Contains(
+            "Subject",
+            Assert.Throws<OptionsValidationException>(() => Catalog(provider)).Message
+        );
     }
 
     [Theory]
@@ -358,7 +380,10 @@ public sealed class RegistrationTests
             );
 
         await using var provider = BuildProvider(services);
-        Assert.Equal(subject, Assert.Single(Assert.Single(Catalog(provider).Handlers).Subscriptions).Subject);
+        Assert.Equal(
+            subject,
+            Assert.Single(Assert.Single(Catalog(provider).Handlers).Subscriptions).Subject
+        );
     }
 
     [Fact]
@@ -367,8 +392,14 @@ public sealed class RegistrationTests
         var services = CreateServices();
         services
             .AddOrderedInbox<TestDb>()
-            .AddHandler<TestHandler>("locations", h => h.Subscribe("events", "EVENTS", "events.>", "shared"))
-            .AddHandler<TestHandler>("products", h => h.Subscribe("events", "EVENTS", "events.>", "shared"));
+            .AddHandler<TestHandler>(
+                "locations",
+                h => h.Subscribe("events", "EVENTS", "events.>", "shared")
+            )
+            .AddHandler<TestHandler>(
+                "products",
+                h => h.Subscribe("events", "EVENTS", "events.>", "shared")
+            );
 
         await using var provider = BuildProvider(services);
         Assert.Contains(
@@ -383,8 +414,14 @@ public sealed class RegistrationTests
         var services = CreateServices();
         services
             .AddOrderedInbox<TestDb>()
-            .AddHandler<TestHandler>("locations", h => h.Subscribe("events", "EVENTS", "events.>", "locations"))
-            .AddHandler<TestHandler>("products", h => h.Subscribe("events", "EVENTS", "events.>", "products"));
+            .AddHandler<TestHandler>(
+                "locations",
+                h => h.Subscribe("events", "EVENTS", "events.>", "locations")
+            )
+            .AddHandler<TestHandler>(
+                "products",
+                h => h.Subscribe("events", "EVENTS", "events.>", "products")
+            );
 
         await using var provider = BuildProvider(services);
         Assert.Equal(2, Catalog(provider).Handlers.Length);
@@ -408,7 +445,9 @@ public sealed class RegistrationTests
     public async Task Type_handler_and_its_dependencies_are_resolved_in_the_operation_scope()
     {
         var services = CreateServices();
-        services.AddOrderedInbox<TestDb>().AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
+        services
+            .AddOrderedInbox<TestDb>()
+            .AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
         await using var provider = BuildProvider(services);
         var descriptor = Assert.Single(Catalog(provider).Handlers);
 
@@ -423,7 +462,11 @@ public sealed class RegistrationTests
         using var message = JsonDocument.Parse("{}");
         Assert.Equal(
             InboxResult.Applied,
-            await firstHandler.HandleAsync(firstHandler.Db, message.RootElement, CancellationToken.None)
+            await firstHandler.HandleAsync(
+                firstHandler.Db,
+                message.RootElement,
+                CancellationToken.None
+            )
         );
         Assert.Throws<InvalidOperationException>(() => descriptor.Resolve(provider));
     }
@@ -433,10 +476,15 @@ public sealed class RegistrationTests
     {
         var services = CreateServices();
         services.AddSingleton<SingletonHandler>();
-        services.AddOrderedInbox<TestDb>().AddHandler<SingletonHandler>("locations", h => Subscribe(h, "locations"));
+        services
+            .AddOrderedInbox<TestDb>()
+            .AddHandler<SingletonHandler>("locations", h => Subscribe(h, "locations"));
 
         await using var provider = BuildProvider(services);
-        Assert.Contains("not singleton", Assert.Throws<OptionsValidationException>(() => Catalog(provider)).Message);
+        Assert.Contains(
+            "not singleton",
+            Assert.Throws<OptionsValidationException>(() => Catalog(provider)).Message
+        );
     }
 
     [Fact]
@@ -444,7 +492,9 @@ public sealed class RegistrationTests
     {
         var services = new ServiceCollection();
         AddApplicationServices(services, addConnection: false);
-        services.AddOrderedInbox<TestDb>().AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
+        services
+            .AddOrderedInbox<TestDb>()
+            .AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
 
         await using var provider = BuildProvider(services);
         Assert.Contains(
@@ -462,17 +512,28 @@ public sealed class RegistrationTests
             .AddOrderedInbox<TestDb>()
             .AddHandler<TestHandler>(
                 "locations",
-                h => h.Subscribe("events", "EVENTS", "events.>", "locations", connectionName: "main")
+                h =>
+                    h.Subscribe("events", "EVENTS", "events.>", "locations", connectionName: "main")
             );
         await using var provider = BuildProvider(services);
-        Assert.Equal("main", Assert.Single(Assert.Single(Catalog(provider).Handlers).Subscriptions).ConnectionName);
+        Assert.Equal(
+            "main",
+            Assert.Single(Assert.Single(Catalog(provider).Handlers).Subscriptions).ConnectionName
+        );
 
         var invalid = CreateServices();
         invalid
             .AddOrderedInbox<TestDb>()
             .AddHandler<TestHandler>(
                 "locations",
-                h => h.Subscribe("events", "EVENTS", "events.>", "locations", connectionName: "missing")
+                h =>
+                    h.Subscribe(
+                        "events",
+                        "EVENTS",
+                        "events.>",
+                        "locations",
+                        connectionName: "missing"
+                    )
             );
         await using var invalidProvider = BuildProvider(invalid);
         Assert.Contains(
@@ -533,7 +594,9 @@ public sealed class RegistrationTests
     {
         var services = CreateServices();
         services.AddSingleton<InboxDiagnostics>();
-        services.AddOrderedInbox<TestDb>().AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
+        services
+            .AddOrderedInbox<TestDb>()
+            .AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
         await using var provider = BuildProvider(services);
         var error = Assert.Throws<OptionsValidationException>(() => Catalog(provider));
         Assert.Contains("InboxDiagnostics must be registered as scoped", error.Message);
@@ -579,7 +642,10 @@ public sealed class RegistrationTests
     [InlineData("Defaults:Retry:MaxDelay", "00:00:00.500")]
     [InlineData("Defaults:IntakeConcurrency", "0")]
     [InlineData("Handlers:locations:Subscriptions:locations-events:BatchSize", "0")]
-    [InlineData("Handlers:locations:Subscriptions:locations-events:DurableName", "location-service.locations")]
+    [InlineData(
+        "Handlers:locations:Subscriptions:locations-events:DurableName",
+        "location-service.locations"
+    )]
     public async Task Invalid_settings_are_rejected(string key, string value)
     {
         var configuration = new ConfigurationBuilder()
@@ -622,7 +688,10 @@ public sealed class RegistrationTests
             .AddHandler<TestHandler>("locations");
 
         await using var provider = BuildProvider(services);
-        Assert.Contains("DlqPolicy", Assert.Throws<OptionsValidationException>(() => Catalog(provider)).Message);
+        Assert.Contains(
+            "DlqPolicy",
+            Assert.Throws<OptionsValidationException>(() => Catalog(provider)).Message
+        );
     }
 
     [Fact]
@@ -646,7 +715,9 @@ public sealed class RegistrationTests
         );
         services.AddScoped<Marker>();
         services.AddSingleton<INatsConnection>(static _ => new NatsConnection());
-        services.AddOrderedInbox<TestDb>().AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
+        services
+            .AddOrderedInbox<TestDb>()
+            .AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
 
         await using var provider = BuildProvider(services);
         Assert.Contains(
@@ -661,7 +732,9 @@ public sealed class RegistrationTests
         var services = new ServiceCollection();
         AddApplicationServices(services, addConnection: false);
         services.AddScoped<INatsConnection>(static _ => new NatsConnection());
-        services.AddOrderedInbox<TestDb>().AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
+        services
+            .AddOrderedInbox<TestDb>()
+            .AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
 
         await using var provider = BuildProvider(services);
         Assert.Contains(
@@ -679,7 +752,9 @@ public sealed class RegistrationTests
         builder.Services.AddSingleton<INatsConnection>(static _ => new NatsConnection());
         var observer = new StartupObserver();
         builder.Services.AddSingleton<IHostedService>(observer);
-        builder.Services.AddOrderedInbox<TestDb>().AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
+        builder
+            .Services.AddOrderedInbox<TestDb>()
+            .AddHandler<TestHandler>("locations", h => Subscribe(h, "locations"));
 
         using var host = builder.Build();
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -692,7 +767,9 @@ public sealed class RegistrationTests
     public async Task All_disabled_handlers_can_start_without_database_or_broker_registration()
     {
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.AddOrderedInbox<TestDb>().AddHandler<SingletonHandler>("locations", h => h.Enabled = false);
+        builder
+            .Services.AddOrderedInbox<TestDb>()
+            .AddHandler<SingletonHandler>("locations", h => h.Enabled = false);
         using var host = builder.Build();
         await host.StartAsync(TestContext.Current.CancellationToken);
         await host.StopAsync(TestContext.Current.CancellationToken);
@@ -705,7 +782,10 @@ public sealed class RegistrationTests
         return services;
     }
 
-    private static void AddApplicationServices(IServiceCollection services, bool addConnection = true)
+    private static void AddApplicationServices(
+        IServiceCollection services,
+        bool addConnection = true
+    )
     {
         services.AddLogging();
         services.AddDbContext<TestDb>(o =>
@@ -717,7 +797,9 @@ public sealed class RegistrationTests
     }
 
     private static ServiceProvider BuildProvider(IServiceCollection services) =>
-        services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+        services.BuildServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true }
+        );
 
     private static InboxCatalog<TestDb> Catalog(IServiceProvider provider) =>
         provider.GetRequiredService<InboxCatalog<TestDb>>();
@@ -745,7 +827,11 @@ public sealed class RegistrationTests
         public TestDb Db => db;
         public Marker Marker => marker;
 
-        public Task<InboxResult> HandleAsync(TestDb currentDb, JsonElement message, CancellationToken cancellationToken)
+        public Task<InboxResult> HandleAsync(
+            TestDb currentDb,
+            JsonElement message,
+            CancellationToken cancellationToken
+        )
         {
             cancellationToken.ThrowIfCancellationRequested();
             Assert.Same(Db, currentDb);
@@ -755,8 +841,11 @@ public sealed class RegistrationTests
 
     private sealed class SingletonHandler : IInboxHandler<TestDb>
     {
-        public Task<InboxResult> HandleAsync(TestDb db, JsonElement message, CancellationToken cancellationToken) =>
-            Task.FromResult(InboxResult.Applied);
+        public Task<InboxResult> HandleAsync(
+            TestDb db,
+            JsonElement message,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(InboxResult.Applied);
     }
 
     private sealed class StartupObserver : IHostedService

@@ -8,7 +8,9 @@ namespace MonixOne.Inbox.Registration;
 internal static class InboxSettingsValidator
 {
     // CancellationTokenSource and Task.Delay cannot represent arbitrary TimeSpan values.
-    private static readonly TimeSpan _maxTimerInterval = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+    private static readonly TimeSpan _maxTimerInterval = TimeSpan.FromMilliseconds(
+        uint.MaxValue - 1
+    );
 
     internal static void Validate<TDbContext>(
         InboxSettings settings,
@@ -23,7 +25,9 @@ internal static class InboxSettingsValidator
             string.IsNullOrEmpty(settings.Schema)
             || settings.Schema.Length > 63
             || !(char.IsAsciiLetterLower(settings.Schema[0]) || settings.Schema[0] == '_')
-            || settings.Schema.Any(c => !(char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '_'))
+            || settings.Schema.Any(c =>
+                !(char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '_')
+            )
             || settings.Schema.StartsWith("pg_", StringComparison.Ordinal)
         )
             errors.Add(
@@ -32,7 +36,10 @@ internal static class InboxSettingsValidator
             );
 
         var cleanup = settings.HistoryCleanup;
-        if (cleanup.CompletedRetention <= TimeSpan.Zero || cleanup.DeadLetterRetention <= TimeSpan.Zero)
+        if (
+            cleanup.CompletedRetention <= TimeSpan.Zero
+            || cleanup.DeadLetterRetention <= TimeSpan.Zero
+        )
             errors.Add("HistoryCleanup retention must be positive.");
         CheckInterval(cleanup.Interval, "HistoryCleanup.Interval", errors);
         if (cleanup.BatchSize < 1)
@@ -47,9 +54,13 @@ internal static class InboxSettingsValidator
         if (handlers.Any(h => h.Enabled))
         {
             if (FindService(services, typeof(InboxDiagnostics))?.Lifetime != ServiceLifetime.Scoped)
-                errors.Add("InboxDiagnostics must be registered as scoped to isolate business attempts.");
+                errors.Add(
+                    "InboxDiagnostics must be registered as scoped to isolate business attempts."
+                );
             if (!available.IsService(typeof(TDbContext)))
-                errors.Add($"Register the application DbContext '{typeof(TDbContext).Name}' before host startup.");
+                errors.Add(
+                    $"Register the application DbContext '{typeof(TDbContext).Name}' before host startup."
+                );
             else if (FindService(services, typeof(TDbContext))?.Lifetime != ServiceLifetime.Scoped)
                 errors.Add(
                     "The application DbContext must be registered as scoped so all operation "
@@ -57,8 +68,13 @@ internal static class InboxSettingsValidator
                 );
         }
 
-        if (FindService(services, typeof(IInboxEnvelopeAdapter))?.Lifetime == ServiceLifetime.Singleton)
-            errors.Add("IInboxEnvelopeAdapter must be scoped or transient for operation-scoped dependencies.");
+        if (
+            FindService(services, typeof(IInboxEnvelopeAdapter))?.Lifetime
+            == ServiceLifetime.Singleton
+        )
+            errors.Add(
+                "IInboxEnvelopeAdapter must be scoped or transient for operation-scoped dependencies."
+            );
 
         var consumers = new HashSet<(string? Connection, string Stream, string Durable)>();
         foreach (var handler in handlers)
@@ -76,13 +92,20 @@ internal static class InboxSettingsValidator
             if (handler.Enabled)
             {
                 if (!available.IsService(handler.HandlerType))
-                    errors.Add($"Register handler dependency '{handler.HandlerType.Name}' for '{handler.Id}' in DI.");
+                    errors.Add(
+                        $"Register handler dependency '{handler.HandlerType.Name}' for '{handler.Id}' in DI."
+                    );
                 if (
-                    FindService(services, handler.HandlerType)?.Lifetime == ServiceLifetime.Singleton
+                    FindService(services, handler.HandlerType)?.Lifetime
+                    == ServiceLifetime.Singleton
                 )
-                    errors.Add($"Handler '{handler.Id}' must be scoped or transient, not singleton.");
+                    errors.Add(
+                        $"Handler '{handler.Id}' must be scoped or transient, not singleton."
+                    );
                 if (handler.Subscriptions.IsEmpty)
-                    errors.Add($"Enabled handler '{handler.Id}' requires at least one subscription.");
+                    errors.Add(
+                        $"Enabled handler '{handler.Id}' requires at least one subscription."
+                    );
             }
 
             foreach (var subscription in handler.Subscriptions)
@@ -109,7 +132,10 @@ internal static class InboxSettingsValidator
                     );
                 if (subscription.BatchSize < 1)
                     errors.Add($"{path}: BatchSize must be positive.");
-                if (subscription.ConnectionName is not null && string.IsNullOrWhiteSpace(subscription.ConnectionName))
+                if (
+                    subscription.ConnectionName is not null
+                    && string.IsNullOrWhiteSpace(subscription.ConnectionName)
+                )
                     errors.Add(
                         $"{path}: ConnectionName must be omitted for the default connection or contain a "
                             + $"nonempty DI key."
@@ -122,16 +148,25 @@ internal static class InboxSettingsValidator
                     ? "the default"
                     : $"keyed '{subscription.ConnectionName}'";
                 if (!hasConnection)
-                    errors.Add($"{path}: Register " + $"{connectionDescription} INatsConnection in DI.");
+                    errors.Add(
+                        $"{path}: Register " + $"{connectionDescription} INatsConnection in DI."
+                    );
                 else if (
-                    FindService(services, typeof(INatsConnection), subscription.ConnectionName)?.Lifetime
-                    != ServiceLifetime.Singleton
+                    FindService(
+                        services,
+                        typeof(INatsConnection),
+                        subscription.ConnectionName
+                    )?.Lifetime != ServiceLifetime.Singleton
                 )
                     errors.Add(
                         $"{path}: INatsConnection must be singleton; the application DI container owns its lifetime."
                     );
 
-                if (!consumers.Add((subscription.ConnectionName, subscription.Stream, subscription.DurableName)))
+                if (
+                    !consumers.Add(
+                        (subscription.ConnectionName, subscription.Stream, subscription.DurableName)
+                    )
+                )
                     errors.Add(
                         $"{path}: This connection/stream/durable consumer is already assigned to another "
                             + $"subscription. Use independent durable consumers."
@@ -140,7 +175,11 @@ internal static class InboxSettingsValidator
         }
     }
 
-    private static ServiceDescriptor? FindService(IServiceCollection services, Type serviceType, string? key = null) =>
+    private static ServiceDescriptor? FindService(
+        IServiceCollection services,
+        Type serviceType,
+        string? key = null
+    ) =>
         services.LastOrDefault(d =>
             d.ServiceType == serviceType
             && (key is null ? !d.IsKeyedService : d.IsKeyedService && Equals(d.ServiceKey, key))
@@ -160,7 +199,11 @@ internal static class InboxSettingsValidator
             );
     }
 
-    private static void CheckProcessing<TDbContext>(string id, InboxProcessingSettings settings, List<string> errors)
+    private static void CheckProcessing<TDbContext>(
+        string id,
+        InboxProcessingSettings settings,
+        List<string> errors
+    )
         where TDbContext : DbContext
     {
         var path = $"Handler '{id}'";
@@ -168,7 +211,12 @@ internal static class InboxSettingsValidator
             errors.Add($"{path}: MaxParallelObjects must be positive.");
         CheckInterval(settings.HandlerTimeout, $"{path}: HandlerTimeout", errors);
         CheckInterval(settings.PollInterval, $"{path}: PollInterval", errors);
-        CheckInterval(settings.StartupReorderWindow, $"{path}: StartupReorderWindow", errors, allowZero: true);
+        CheckInterval(
+            settings.StartupReorderWindow,
+            $"{path}: StartupReorderWindow",
+            errors,
+            allowZero: true
+        );
         CheckInterval(settings.GapTimeout, $"{path}: GapTimeout", errors, allowZero: true);
         if (settings.IntakeConcurrency < 1)
             errors.Add($"{path}: IntakeConcurrency must be positive.");
@@ -180,19 +228,32 @@ internal static class InboxSettingsValidator
             errors.Add($"{path}: Retry.MaxDelay must be greater than or equal to InitialDelay.");
     }
 
-    private static void CheckInterval(TimeSpan value, string path, List<string> errors, bool allowZero = false)
+    private static void CheckInterval(
+        TimeSpan value,
+        string path,
+        List<string> errors,
+        bool allowZero = false
+    )
     {
-        if (value < (allowZero ? TimeSpan.Zero : TimeSpan.FromMilliseconds(1)) || value > _maxTimerInterval)
+        if (
+            value < (allowZero ? TimeSpan.Zero : TimeSpan.FromMilliseconds(1))
+            || value > _maxTimerInterval
+        )
             errors.Add($"{path} must be between 1 ms and {_maxTimerInterval}.");
     }
 
     private static bool ValidNatsName(string value) =>
         !string.IsNullOrEmpty(value)
-        && !value.Any(c => char.IsWhiteSpace(c) || char.IsControl(c) || c is '.' or '*' or '>' or '/' or '\\');
+        && !value.Any(c =>
+            char.IsWhiteSpace(c) || char.IsControl(c) || c is '.' or '*' or '>' or '/' or '\\'
+        );
 
     private static bool ValidSubject(string subject)
     {
-        if (string.IsNullOrEmpty(subject) || subject.Any(c => char.IsWhiteSpace(c) || char.IsControl(c)))
+        if (
+            string.IsNullOrEmpty(subject)
+            || subject.Any(c => char.IsWhiteSpace(c) || char.IsControl(c))
+        )
             return false;
 
         var tokens = subject.Split('.');

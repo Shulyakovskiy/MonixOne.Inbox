@@ -28,7 +28,10 @@ internal sealed class InboxStartup<TDbContext>(
         catch (Exception error)
         {
             barrier.Fail(error);
-            if (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            if (
+                error is not OperationCanceledException
+                || !cancellationToken.IsCancellationRequested
+            )
                 logger.LogError(
                     error,
                     "OrderedInbox initialization failed for schema {Schema}; message intake cannot start.",

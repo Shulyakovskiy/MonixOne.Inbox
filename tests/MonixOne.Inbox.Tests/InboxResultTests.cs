@@ -9,12 +9,18 @@ public sealed class InboxResultTests
     {
         using var details = JsonDocument.Parse("""{"profile_id":42}""");
         var delay = TimeSpan.FromSeconds(5);
-        var result = InboxResult.Retry("Profile is not ready.", delay, details: details.RootElement);
+        var result = InboxResult.Retry(
+            "Profile is not ready.",
+            delay,
+            details: details.RootElement
+        );
 
         var json = JsonSerializer.SerializeToElement(result);
 
-        Assert.Equal(new[] { "kind", "code", "reason", "retryAfter", "details" },
-            json.EnumerateObject().Select(x => x.Name));
+        Assert.Equal(
+            new[] { "kind", "code", "reason", "retryAfter", "details" },
+            json.EnumerateObject().Select(x => x.Name)
+        );
         Assert.Equal(delay, json.GetProperty("retryAfter").Deserialize<TimeSpan>());
         Assert.Equal(42, json.GetProperty("details").GetProperty("profile_id").GetInt32());
     }
@@ -33,7 +39,9 @@ public sealed class InboxResultTests
     public void Retry_delay_cannot_be_zero_or_negative()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => InboxResult.Retry("Later", TimeSpan.Zero));
-        Assert.Throws<ArgumentOutOfRangeException>(() => InboxResult.Retry("Later", TimeSpan.FromSeconds(-1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            InboxResult.Retry("Later", TimeSpan.FromSeconds(-1))
+        );
     }
 
     [Fact]

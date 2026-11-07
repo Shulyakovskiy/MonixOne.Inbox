@@ -41,7 +41,10 @@ internal sealed class InboxProcessor<TDbContext>(
     private bool _gapClosed;
 
     internal async Task<bool> ProcessOneAsync(
-        InboxHandlerRegistration<TDbContext> handler, string worker, CancellationToken token)
+        InboxHandlerRegistration<TDbContext> handler,
+        string worker,
+        CancellationToken token
+    )
     {
         InboxStateRow? state = null;
         InboxRow? row = null;
@@ -51,63 +54,108 @@ internal sealed class InboxProcessor<TDbContext>(
         var committing = false;
         try
         {
-            var processed = await new SingleExecution(context).ExecuteAsync(async cancellation =>
-            {
-                await using var transaction = await context.Database.BeginTransactionAsync(
-                    IsolationLevel.ReadCommitted, cancellation);
-                await using var data = context.CreateLinqToDBConnection(transaction);
-                if (context.Database.GetCommandTimeout() is { } timeout)
-                    data.CommandTimeout = timeout;
-                var candidates = await CandidatesAsync(data, handler, cancellation);
-                foreach (var candidate in candidates)
+            var processed = await new SingleExecution(context).ExecuteAsync(
+                async cancellation =>
                 {
-                    var key = new InboxProcessingKey(handler.Id, candidate.Producer,
-                        candidate.SequenceScope, candidate.ObjectKey);
-                    if (!running.TryAdd(key))
-                        continue;
-                    acquired = key;
-                    state = candidate;
-                    row = await data.GetTable<InboxRow>().SchemaName(Schema)
-                        .SingleOrDefaultAsyncLinqToDB(x => x.Id == candidate.InboxId, cancellation);
-                    if (row is null)
-                        throw new CoordinationLostException();
-                    if (row.Sequence <= state.LastSequence)
+                    await using var transaction = await context.Database.BeginTransactionAsync(
+                        IsolationLevel.ReadCommitted,
+                        cancellation
+                    );
+                    await using var data = context.CreateLinqToDBConnection(transaction);
+                    if (context.Database.GetCommandTimeout() is { } timeout)
+                        data.CommandTimeout = timeout;
+                    var candidates = await CandidatesAsync(data, handler, cancellation);
+                    foreach (var candidate in candidates)
                     {
-                        await CoordinateAsync(data, state, row, advance: false, cancellation);
-                        await SkipStaleAsync(data, state, row, worker, cancellation);
-                    }
-                    else if (row.Status == "pending" && row.Code == "terminal_policy_transition")
-                    {
-                        await CoordinateAsync(data, state, row, advance: true, cancellation);
-                        row.Status = "dead";
-                        row.CompletedAt = DateTimeOffset.UtcNow;
-                        await WriteInboxAsync(data, row, cancellation);
-                        await JournalAsync(data, row, worker, "terminal_policy_transition", null, null,
-                            new { lastSequence = row.Sequence }, cancellation);
-                        await CloseRangeAsync(data, state, row, worker, candidate.FirstReceivedAt, cancellation);
-                    }
-                    else
-                        attempt = await ApplyAsync(data, transaction, state, row, handler, worker,
-                            candidate.FirstReceivedAt, cancellation);
+                        var key = new InboxProcessingKey(
+                            handler.Id,
+                            candidate.Producer,
+                            candidate.SequenceScope,
+                            candidate.ObjectKey
+                        );
+                        if (!running.TryAdd(key))
+                            continue;
+                        acquired = key;
+                        state = candidate;
+                        row = await data.GetTable<InboxRow>()
+                            .SchemaName(Schema)
+                            .SingleOrDefaultAsyncLinqToDB(
+                                x => x.Id == candidate.InboxId,
+                                cancellation
+                            );
+                        if (row is null)
+                            throw new CoordinationLostException();
+                        if (row.Sequence <= state.LastSequence)
+                        {
+                            await CoordinateAsync(data, state, row, advance: false, cancellation);
+                            await SkipStaleAsync(data, state, row, worker, cancellation);
+                        }
+                        else if (
+                            row.Status == "pending"
+                            && row.Code == "terminal_policy_transition"
+                        )
+                        {
+                            await CoordinateAsync(data, state, row, advance: true, cancellation);
+                            row.Status = "dead";
+                            row.CompletedAt = DateTimeOffset.UtcNow;
+                            await WriteInboxAsync(data, row, cancellation);
+                            await JournalAsync(
+                                data,
+                                row,
+                                worker,
+                                "terminal_policy_transition",
+                                null,
+                                null,
+                                new { lastSequence = row.Sequence },
+                                cancellation
+                            );
+                            await CloseRangeAsync(
+                                data,
+                                state,
+                                row,
+                                worker,
+                                candidate.FirstReceivedAt,
+                                cancellation
+                            );
+                        }
+                        else
+                            attempt = await ApplyAsync(
+                                data,
+                                transaction,
+                                state,
+                                row,
+                                handler,
+                                worker,
+                                candidate.FirstReceivedAt,
+                                cancellation
+                            );
 
-                    committing = true;
-                    await transaction.CommitAsync(cancellation);
-                    committing = false;
-                    return true;
-                }
-                return false;
-            }, token);
+                        committing = true;
+                        await transaction.CommitAsync(cancellation);
+                        committing = false;
+                        return true;
+                    }
+                    return false;
+                },
+                token
+            );
             if (processed)
                 ObserveCommitted(state!, row!, attempt, worker);
             return processed;
         }
-        catch (Exception) when (committing && state is not null && row is not null && !token.IsCancellationRequested)
+        catch (Exception)
+            when (committing
+                && state is not null
+                && row is not null
+                && !token.IsCancellationRequested
+            )
         {
             // Dispose/rollback the old transaction before reading immutable proof on the primary.
             await VerifyCommitAsync(state, row, decisionId, attempt?.AttemptId, worker, token);
             return true;
         }
-        catch (Exception error) when (error is CoordinationLostException || CoordinationFailure(error))
+        catch (Exception error)
+            when (error is CoordinationLostException || CoordinationFailure(error))
         {
             context.ChangeTracker.Clear();
             await Task.Delay(Random.Shared.Next(25, 76), token);
@@ -121,49 +169,117 @@ internal sealed class InboxProcessor<TDbContext>(
         }
     }
 
-    internal IQueryable<Candidate> CandidatesQuery(DataConnection data,
-        InboxHandlerRegistration<TDbContext> handler)
+    internal IQueryable<Candidate> CandidatesQuery(
+        DataConnection data,
+        InboxHandlerRegistration<TDbContext> handler
+    )
     {
-        var active = data.GetTable<InboxRow>().SchemaName(Schema)
-            .Where(x => x.HandlerId == handler.Id && (x.Status == "pending" || x.Status == "retry"));
+        var active = data.GetTable<InboxRow>()
+            .SchemaName(Schema)
+            .Where(x =>
+                x.HandlerId == handler.Id && (x.Status == "pending" || x.Status == "retry")
+            );
         foreach (var key in running.Snapshot(handler.Id))
-            active = active.Where(x => x.Producer != key.Producer ||
-                x.SequenceScope != key.Scope || x.ObjectKey != key.ObjectKey);
+            active = active.Where(x =>
+                x.Producer != key.Producer
+                || x.SequenceScope != key.Scope
+                || x.ObjectKey != key.ObjectKey
+            );
 
         // DistinctBy translates to PostgreSQL DISTINCT ON; the window includes every active row of the key.
-        var heads = active.Select(x => new
+        var heads = active
+            .Select(x => new
             {
-                x.Id, x.Producer, x.SequenceScope, x.ObjectKey, x.Sequence, x.NextAttemptAt,
-                FirstReceivedAt = Sql.Ext.Min(x.ReceivedAt).Over()
-                    .PartitionBy(x.Producer, x.SequenceScope, x.ObjectKey).ToValue(),
+                x.Id,
+                x.Producer,
+                x.SequenceScope,
+                x.ObjectKey,
+                x.Sequence,
+                x.NextAttemptAt,
+                FirstReceivedAt = Sql
+                    .Ext.Min(x.ReceivedAt)
+                    .Over()
+                    .PartitionBy(x.Producer, x.SequenceScope, x.ObjectKey)
+                    .ToValue(),
             })
-            .OrderBy(x => x.Producer).ThenBy(x => x.SequenceScope).ThenBy(x => x.ObjectKey).ThenBy(x => x.Sequence)
-            .DistinctBy(x => new { x.Producer, x.SequenceScope, x.ObjectKey }).AsCte("heads");
+            .OrderBy(x => x.Producer)
+            .ThenBy(x => x.SequenceScope)
+            .ThenBy(x => x.ObjectKey)
+            .ThenBy(x => x.Sequence)
+            .DistinctBy(x => new
+            {
+                x.Producer,
+                x.SequenceScope,
+                x.ObjectKey,
+            })
+            .AsCte("heads");
         var states = data.GetTable<InboxStateRow>().SchemaName(Schema);
-        var candidates = from head in heads
-            join state in states on new { HandlerId = handler.Id, head.Producer, head.SequenceScope, head.ObjectKey }
-                equals new { state.HandlerId, state.Producer, state.SequenceScope, state.ObjectKey }
-            where head.Sequence <= state.LastSequence ||
-                ((head.NextAttemptAt == null || head.NextAttemptAt <= InboxPostgreSql.TransactionTimestamp()) &&
-                 ((state.LastSequence == null && head.FirstReceivedAt <= InboxPostgreSql.Subtract(
-                       InboxPostgreSql.TransactionTimestamp(), handler.Processing.StartupReorderWindow)) ||
-                  (state.LastSequence != null && ((decimal)head.Sequence == (decimal)state.LastSequence + 1m ||
-                       head.FirstReceivedAt <= InboxPostgreSql.Subtract(
-                           InboxPostgreSql.TransactionTimestamp(), handler.Processing.GapTimeout)))))
+        var candidates =
+            from head in heads
+            join state in states
+                on new
+                {
+                    HandlerId = handler.Id,
+                    head.Producer,
+                    head.SequenceScope,
+                    head.ObjectKey,
+                } equals new
+                {
+                    state.HandlerId,
+                    state.Producer,
+                    state.SequenceScope,
+                    state.ObjectKey,
+                }
+            where
+                head.Sequence <= state.LastSequence
+                || (
+                    (
+                        head.NextAttemptAt == null
+                        || head.NextAttemptAt <= InboxPostgreSql.TransactionTimestamp()
+                    )
+                    && (
+                        (
+                            state.LastSequence == null
+                            && head.FirstReceivedAt
+                                <= InboxPostgreSql.Subtract(
+                                    InboxPostgreSql.TransactionTimestamp(),
+                                    handler.Processing.StartupReorderWindow
+                                )
+                        )
+                        || (
+                            state.LastSequence != null
+                            && (
+                                (decimal)head.Sequence == (decimal)state.LastSequence + 1m
+                                || head.FirstReceivedAt
+                                    <= InboxPostgreSql.Subtract(
+                                        InboxPostgreSql.TransactionTimestamp(),
+                                        handler.Processing.GapTimeout
+                                    )
+                            )
+                        )
+                    )
+                )
             orderby state.UpdatedAt, head.FirstReceivedAt, head.Id
             select new Candidate
             {
-                InboxId = head.Id, HandlerId = state.HandlerId, Producer = state.Producer,
-                SequenceScope = state.SequenceScope, ObjectKey = state.ObjectKey,
-                LastSequence = state.LastSequence, Version = state.Version,
-                UpdatedAt = state.UpdatedAt, FirstReceivedAt = head.FirstReceivedAt,
+                InboxId = head.Id,
+                HandlerId = state.HandlerId,
+                Producer = state.Producer,
+                SequenceScope = state.SequenceScope,
+                ObjectKey = state.ObjectKey,
+                LastSequence = state.LastSequence,
+                Version = state.Version,
+                UpdatedAt = state.UpdatedAt,
+                FirstReceivedAt = head.FirstReceivedAt,
             };
         return candidates.Take(32);
     }
 
-    private Task<List<Candidate>> CandidatesAsync(DataConnection data,
-        InboxHandlerRegistration<TDbContext> handler, CancellationToken token) =>
-        CandidatesQuery(data, handler).ToListAsyncLinqToDB(token);
+    private Task<List<Candidate>> CandidatesAsync(
+        DataConnection data,
+        InboxHandlerRegistration<TDbContext> handler,
+        CancellationToken token
+    ) => CandidatesQuery(data, handler).ToListAsyncLinqToDB(token);
 
     internal sealed class Candidate : InboxStateRow
     {
@@ -181,22 +297,44 @@ internal sealed class InboxProcessor<TDbContext>(
         return false;
     }
 
-    private async Task CoordinateAsync(DataConnection data, InboxStateRow state, InboxRow row,
-        bool advance, CancellationToken token)
+    private async Task CoordinateAsync(
+        DataConnection data,
+        InboxStateRow state,
+        InboxRow row,
+        bool advance,
+        CancellationToken token
+    )
     {
         // Applied business writes have already completed. This timeout affects coordination only.
         await InboxPostgreSql.SetLockTimeoutAsync(data, token);
         var inbox = data.GetTable<InboxRow>().SchemaName(Schema);
-        var changed = await data.GetTable<InboxStateRow>().SchemaName(Schema)
-            .Where(s => s.HandlerId == state.HandlerId && s.Producer == state.Producer &&
-                s.SequenceScope == state.SequenceScope && s.ObjectKey == state.ObjectKey &&
-                s.Version == state.Version &&
-                (s.LastSequence == state.LastSequence || (s.LastSequence == null && state.LastSequence == null)) &&
-                inbox.Any(i => i.Id == row.Id && i.RunId == row.RunId && i.AttemptCount == row.AttemptCount &&
-                    (i.Status == "pending" || i.Status == "retry")) &&
-                !inbox.Any(earlier => earlier.HandlerId == s.HandlerId && earlier.Producer == s.Producer &&
-                    earlier.SequenceScope == s.SequenceScope && earlier.ObjectKey == s.ObjectKey &&
-                    (earlier.Status == "pending" || earlier.Status == "retry") && earlier.Sequence < row.Sequence))
+        var changed = await data.GetTable<InboxStateRow>()
+            .SchemaName(Schema)
+            .Where(s =>
+                s.HandlerId == state.HandlerId
+                && s.Producer == state.Producer
+                && s.SequenceScope == state.SequenceScope
+                && s.ObjectKey == state.ObjectKey
+                && s.Version == state.Version
+                && (
+                    s.LastSequence == state.LastSequence
+                    || (s.LastSequence == null && state.LastSequence == null)
+                )
+                && inbox.Any(i =>
+                    i.Id == row.Id
+                    && i.RunId == row.RunId
+                    && i.AttemptCount == row.AttemptCount
+                    && (i.Status == "pending" || i.Status == "retry")
+                )
+                && !inbox.Any(earlier =>
+                    earlier.HandlerId == s.HandlerId
+                    && earlier.Producer == s.Producer
+                    && earlier.SequenceScope == s.SequenceScope
+                    && earlier.ObjectKey == s.ObjectKey
+                    && (earlier.Status == "pending" || earlier.Status == "retry")
+                    && earlier.Sequence < row.Sequence
+                )
+            )
             .Set(s => s.Version, s => s.Version + 1)
             .Set(s => s.UpdatedAt, _ => InboxPostgreSql.ClockTimestamp())
             .Set(s => s.LastSequence, s => advance ? row.Sequence : s.LastSequence)
@@ -205,25 +343,60 @@ internal sealed class InboxProcessor<TDbContext>(
             throw new CoordinationLostException();
     }
 
-    private async Task CloseRangeAsync(DataConnection data, InboxStateRow state, InboxRow row,
-        string worker, DateTimeOffset firstReceivedAt, CancellationToken token)
+    private async Task CloseRangeAsync(
+        DataConnection data,
+        InboxStateRow state,
+        InboxRow row,
+        string worker,
+        DateTimeOffset firstReceivedAt,
+        CancellationToken token
+    )
     {
         if (state.LastSequence is null)
-            await JournalAsync(data, row, worker, "initial_sequence_selected", null, null,
-                new { previousCursor = (long?)null, selectedSequence = row.Sequence }, token);
+            await JournalAsync(
+                data,
+                row,
+                worker,
+                "initial_sequence_selected",
+                null,
+                null,
+                new { previousCursor = (long?)null, selectedSequence = row.Sequence },
+                token
+            );
         else if (row.Sequence - 1 > state.LastSequence)
         {
             _gapClosed = true;
-            await JournalAsync(data, row, worker, "gap_skipped", null, null,
-                new { previousCursor = state.LastSequence, firstMissing = state.LastSequence + 1,
-                    lastMissing = row.Sequence - 1, selectedSequence = row.Sequence,
-                    waitedMs = Math.Max(0, (DateTimeOffset.UtcNow - firstReceivedAt).TotalMilliseconds) }, token);
+            await JournalAsync(
+                data,
+                row,
+                worker,
+                "gap_skipped",
+                null,
+                null,
+                new
+                {
+                    previousCursor = state.LastSequence,
+                    firstMissing = state.LastSequence + 1,
+                    lastMissing = row.Sequence - 1,
+                    selectedSequence = row.Sequence,
+                    waitedMs = Math.Max(
+                        0,
+                        (DateTimeOffset.UtcNow - firstReceivedAt).TotalMilliseconds
+                    ),
+                },
+                token
+            );
         }
         state.LastSequence = row.Sequence;
         state.Version++;
     }
 
-    private void ObserveCommitted(InboxStateRow state, InboxRow row, InboxAttemptRow? attempt, string worker)
+    private void ObserveCommitted(
+        InboxStateRow state,
+        InboxRow row,
+        InboxAttemptRow? attempt,
+        string worker
+    )
     {
         metrics.Processing(Schema, row, attempt);
         if (_gapClosed)
@@ -292,7 +465,10 @@ internal sealed class InboxProcessor<TDbContext>(
                 row,
                 handler,
                 worker,
-                InboxResult.Reject("Business attempt budget is already exhausted.", "retry_exhausted"),
+                InboxResult.Reject(
+                    "Business attempt budget is already exhausted.",
+                    "retry_exhausted"
+                ),
                 null,
                 firstReceivedAt,
                 token
@@ -335,7 +511,9 @@ internal sealed class InboxProcessor<TDbContext>(
         {
             using var json = JsonDocument.Parse(row.Envelope);
             result =
-                await handler.Resolve(services).HandleAsync(context, json.RootElement, deadline.Token)
+                await handler
+                    .Resolve(services)
+                    .HandleAsync(context, json.RootElement, deadline.Token)
                 ?? throw new InvalidOperationException("Business handler returned null.");
             token.ThrowIfCancellationRequested();
             deadline.Token.ThrowIfCancellationRequested();
@@ -384,10 +562,30 @@ internal sealed class InboxProcessor<TDbContext>(
         attempt.Diagnostics = diagnostics.Complete();
         // Invalid diagnostic JSON must not roll back an otherwise successful business result.
         if (attempt.Diagnostics != "[]")
-            attempt.Diagnostics = await ValidateDiagnosticJsonAsync(data, transaction, attempt.Diagnostics, token);
+            attempt.Diagnostics = await ValidateDiagnosticJsonAsync(
+                data,
+                transaction,
+                attempt.Diagnostics,
+                token
+            );
         if (attempt.Details is not null)
-            attempt.Details = await ValidateDiagnosticJsonAsync(data, transaction, attempt.Details, token);
-        await FinishAsync(data, state, row, handler, worker, result, attempt, firstReceivedAt, token);
+            attempt.Details = await ValidateDiagnosticJsonAsync(
+                data,
+                transaction,
+                attempt.Details,
+                token
+            );
+        await FinishAsync(
+            data,
+            state,
+            row,
+            handler,
+            worker,
+            result,
+            attempt,
+            firstReceivedAt,
+            token
+        );
         return attempt;
     }
 
@@ -398,8 +596,13 @@ internal sealed class InboxProcessor<TDbContext>(
             try
             {
                 var result = classify(error);
-                if (result is null || result.Kind is not (InboxResultKind.Retry or InboxResultKind.Reject))
-                    throw new InvalidOperationException("ClassifyException must return Retry or Reject.");
+                if (
+                    result is null
+                    || result.Kind is not (InboxResultKind.Retry or InboxResultKind.Reject)
+                )
+                    throw new InvalidOperationException(
+                        "ClassifyException must return Retry or Reject."
+                    );
                 return result;
             }
             catch (Exception classificationError)
@@ -428,15 +631,12 @@ internal sealed class InboxProcessor<TDbContext>(
             await data.SelectAsync(() => InboxPostgreSql.ValidateJson(json), token);
             return json;
         }
-        catch (PostgresException error) when (error.SqlState.StartsWith("22", StringComparison.Ordinal))
+        catch (PostgresException error)
+            when (error.SqlState.StartsWith("22", StringComparison.Ordinal))
         {
             await transaction.RollbackToSavepointAsync("diagnostic_json", token);
             // Diagnostic storage failures must not roll back an otherwise valid business outcome.
-            var fallback = new
-            {
-                code = "diagnostics.invalid_jsonb",
-                sqlstate = error.SqlState,
-            };
+            var fallback = new { code = "diagnostics.invalid_jsonb", sqlstate = error.SqlState };
             return json.StartsWith('[')
                 ? JsonSerializer.Serialize(new[] { fallback })
                 : JsonSerializer.Serialize(fallback);
@@ -459,9 +659,11 @@ internal sealed class InboxProcessor<TDbContext>(
         CancellationToken token
     )
     {
-        var terminal = result.Kind == InboxResultKind.Reject ||
-            result.Kind == InboxResultKind.Retry
-            && (attempt?.AttemptNumber ?? row.AttemptCount) >= handler.Processing.Retry.MaxAttempts;
+        var terminal =
+            result.Kind == InboxResultKind.Reject
+            || result.Kind == InboxResultKind.Retry
+                && (attempt?.AttemptNumber ?? row.AttemptCount)
+                    >= handler.Processing.Retry.MaxAttempts;
         var advance = result.Kind is InboxResultKind.Applied or InboxResultKind.Ignore || terminal;
         await CoordinateAsync(data, state, row, advance, token);
         if (attempt is not null)
@@ -477,12 +679,14 @@ internal sealed class InboxProcessor<TDbContext>(
                 InboxResultKind.Ignore => "skipped",
                 _ => "retry",
             };
-        row.Code = result.Kind == InboxResultKind.Retry && terminal ? "retry_exhausted" : result.Code;
+        row.Code =
+            result.Kind == InboxResultKind.Retry && terminal ? "retry_exhausted" : result.Code;
         row.Reason = result.Reason;
         row.CompletedAt = row.Status == "retry" ? null : DateTimeOffset.UtcNow;
         row.NextAttemptAt =
             row.Status == "retry"
-                ? DateTimeOffset.UtcNow + RetryDelay(handler.Processing.Retry, row.AttemptCount, result.RetryAfter)
+                ? DateTimeOffset.UtcNow
+                    + RetryDelay(handler.Processing.Retry, row.AttemptCount, result.RetryAfter)
                 : null;
         Guid? dlqId = null;
         if (terminal)
@@ -579,8 +783,15 @@ internal sealed class InboxProcessor<TDbContext>(
                 SubscriptionId = row.SubscriptionId,
                 WorkerInstanceId = worker,
                 Decision = decision,
-                DecisionId = decision is "processed" or "skipped" or "retry" or "dead" or
-                    "stale_sequence" or "terminal_policy_transition" ? _decisionId : null,
+                DecisionId = decision
+                    is "processed"
+                        or "skipped"
+                        or "retry"
+                        or "dead"
+                        or "stale_sequence"
+                        or "terminal_policy_transition"
+                    ? _decisionId
+                    : null,
                 AttemptId = attempt,
                 DlqId = dlq,
                 Details = JsonSerializer.Serialize(details, _jsonOptions),
@@ -589,8 +800,14 @@ internal sealed class InboxProcessor<TDbContext>(
             token: token
         );
 
-    private async Task VerifyCommitAsync(InboxStateRow original, InboxRow row, Guid decisionId,
-        Guid? attemptId, string worker, CancellationToken token)
+    private async Task VerifyCommitAsync(
+        InboxStateRow original,
+        InboxRow row,
+        Guid decisionId,
+        Guid? attemptId,
+        string worker,
+        CancellationToken token
+    )
     {
         var failures = 0;
         while (true)
@@ -600,61 +817,114 @@ internal sealed class InboxProcessor<TDbContext>(
             {
                 await using var scope = scopes.CreateAsyncScope();
                 var db = scope.ServiceProvider.GetRequiredService<TDbContext>();
-                await new SingleExecution(db).ExecuteAsync(async cancellation =>
-                {
-                    await using var transaction = await db.Database.BeginTransactionAsync(cancellation);
-                    await using var data = db.CreateLinqToDBConnection(transaction);
-                    await InboxPostgreSql.SetLockTimeoutAsync(data, cancellation);
-                    // A short write settles a still-completing coordinator before reading its unique decision id.
-                    // No callback or explicit row lock occurs during verification.
-                    await data.GetTable<InboxStateRow>().SchemaName(Schema)
-                        .Where(x => x.HandlerId == original.HandlerId && x.Producer == original.Producer &&
-                            x.SequenceScope == original.SequenceScope && x.ObjectKey == original.ObjectKey)
-                        .Set(x => x.Version, x => x.Version).UpdateAsync(cancellation);
-                    var committed = await data.GetTable<InboxJournalRow>().SchemaName(Schema)
-                        .AnyAsyncLinqToDB(x => x.DecisionId == decisionId, cancellation);
-                    var attempt = committed && attemptId is not null
-                        ? await data.GetTable<InboxAttemptRow>().SchemaName(Schema)
-                            .SingleOrDefaultAsyncLinqToDB(x => x.AttemptId == attemptId, cancellation)
-                        : null;
-                    var status = attempt is null ? row.Status : await data.GetTable<InboxJournalRow>()
-                        .SchemaName(Schema).Where(x => x.AttemptId == attemptId &&
-                            (x.Decision == "processed" || x.Decision == "skipped" || x.Decision == "retry" ||
-                                x.Decision == "dead")).Select(x => x.Decision).SingleAsyncLinqToDB(cancellation);
-                    await transaction.RollbackAsync(cancellation);
-                    if (committed)
+                await new SingleExecution(db).ExecuteAsync(
+                    async cancellation =>
                     {
-                        metrics.Processing(Schema, row, attempt, status);
-                        if (_gapClosed)
-                            metrics.Decision(Schema, row.HandlerId, row.SubscriptionId, "gap_skipped");
-                    }
-                    logger.LogInformation("OrderedInbox COMMIT checked: decision {DecisionId}, inbox {InboxId}, " +
-                        "committed {Committed}, worker {WorkerInstanceId}.", decisionId, row.Id, committed, worker);
-                }, token);
+                        await using var transaction = await db.Database.BeginTransactionAsync(
+                            cancellation
+                        );
+                        await using var data = db.CreateLinqToDBConnection(transaction);
+                        await InboxPostgreSql.SetLockTimeoutAsync(data, cancellation);
+                        // A short write settles a still-completing coordinator before reading its unique decision id.
+                        // No callback or explicit row lock occurs during verification.
+                        await data.GetTable<InboxStateRow>()
+                            .SchemaName(Schema)
+                            .Where(x =>
+                                x.HandlerId == original.HandlerId
+                                && x.Producer == original.Producer
+                                && x.SequenceScope == original.SequenceScope
+                                && x.ObjectKey == original.ObjectKey
+                            )
+                            .Set(x => x.Version, x => x.Version)
+                            .UpdateAsync(cancellation);
+                        var committed = await data.GetTable<InboxJournalRow>()
+                            .SchemaName(Schema)
+                            .AnyAsyncLinqToDB(x => x.DecisionId == decisionId, cancellation);
+                        var attempt =
+                            committed && attemptId is not null
+                                ? await data.GetTable<InboxAttemptRow>()
+                                    .SchemaName(Schema)
+                                    .SingleOrDefaultAsyncLinqToDB(
+                                        x => x.AttemptId == attemptId,
+                                        cancellation
+                                    )
+                                : null;
+                        var status = attempt is null
+                            ? row.Status
+                            : await data.GetTable<InboxJournalRow>()
+                                .SchemaName(Schema)
+                                .Where(x =>
+                                    x.AttemptId == attemptId
+                                    && (
+                                        x.Decision == "processed"
+                                        || x.Decision == "skipped"
+                                        || x.Decision == "retry"
+                                        || x.Decision == "dead"
+                                    )
+                                )
+                                .Select(x => x.Decision)
+                                .SingleAsyncLinqToDB(cancellation);
+                        await transaction.RollbackAsync(cancellation);
+                        if (committed)
+                        {
+                            metrics.Processing(Schema, row, attempt, status);
+                            if (_gapClosed)
+                                metrics.Decision(
+                                    Schema,
+                                    row.HandlerId,
+                                    row.SubscriptionId,
+                                    "gap_skipped"
+                                );
+                        }
+                        logger.LogInformation(
+                            "OrderedInbox COMMIT checked: decision {DecisionId}, inbox {InboxId}, "
+                                + "committed {Committed}, worker {WorkerInstanceId}.",
+                            decisionId,
+                            row.Id,
+                            committed,
+                            worker
+                        );
+                    },
+                    token
+                );
                 return;
             }
-            catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception error)
             {
                 failures = Math.Min(failures + 1, 6);
-                logger.LogWarning("OrderedInbox COMMIT remains unknown ({ErrorType}), decision {DecisionId}; " +
-                    "callback is not repeated during verification.", error.GetType().Name, decisionId);
+                logger.LogWarning(
+                    "OrderedInbox COMMIT remains unknown ({ErrorType}), decision {DecisionId}; "
+                        + "callback is not repeated during verification.",
+                    error.GetType().Name,
+                    decisionId
+                );
                 await Task.Delay(TimeSpan.FromSeconds(1 << (failures - 1)), token);
             }
         }
     }
 
-    internal static TimeSpan RetryDelay(InboxRetrySettings settings, int attemptNumber, TimeSpan? explicitDelay)
+    internal static TimeSpan RetryDelay(
+        InboxRetrySettings settings,
+        int attemptNumber,
+        TimeSpan? explicitDelay
+    )
     {
         var milliseconds =
             explicitDelay?.TotalMilliseconds
             ?? Math.Min(
                 settings.MaxDelay.TotalMilliseconds,
-                settings.InitialDelay.TotalMilliseconds * Math.Pow(2, Math.Min(attemptNumber - 1, 62))
+                settings.InitialDelay.TotalMilliseconds
+                    * Math.Pow(2, Math.Min(attemptNumber - 1, 62))
             );
         if (explicitDelay is null)
             milliseconds *= 0.5 + Random.Shared.NextDouble() * 0.5;
-        return TimeSpan.FromMilliseconds(Math.Clamp(milliseconds, 1, settings.MaxDelay.TotalMilliseconds));
+        return TimeSpan.FromMilliseconds(
+            Math.Clamp(milliseconds, 1, settings.MaxDelay.TotalMilliseconds)
+        );
     }
 
     private static bool InfrastructureFailure(Exception error)
@@ -668,7 +938,10 @@ internal sealed class InboxProcessor<TDbContext>(
     private static string? Header(string source, string name)
     {
         using var json = JsonDocument.Parse(source);
-        if (!json.RootElement.TryGetProperty("headers", out var headers) || headers.ValueKind != JsonValueKind.Object)
+        if (
+            !json.RootElement.TryGetProperty("headers", out var headers)
+            || headers.ValueKind != JsonValueKind.Object
+        )
             return null;
         foreach (var property in headers.EnumerateObject())
             if (

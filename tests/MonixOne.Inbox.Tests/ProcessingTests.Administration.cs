@@ -23,7 +23,9 @@ public sealed partial class ProcessingTests
         _probe.Handle = (_, _, _) =>
         {
             using var details = JsonDocument.Parse("""{"profile_id":42}""");
-            return Task.FromResult(InboxResult.Reject("Unsupported profile.", details: details.RootElement));
+            return Task.FromResult(
+                InboxResult.Reject("Unsupported profile.", details: details.RootElement)
+            );
         };
         var host = HostFor();
         await SeedAsync(host, 1);
@@ -33,29 +35,73 @@ public sealed partial class ProcessingTests
         var page = (await HistoryAsync(host, id))!;
         var json = JsonSerializer.SerializeToElement(page);
 
-        Assert.Equal(new[] { "inbox", "consumerState", "deadLetter", "entries", "nextJournalId" },
-            json.EnumerateObject().Select(x => x.Name));
-        Assert.Equal("object:created:object-1:1", json.GetProperty("inbox").GetProperty("eventId").GetString());
-        Assert.Equal(Event(1), json.GetProperty("inbox").GetProperty("rawPayload").GetBytesFromBase64());
-        Assert.Equal("correlation-1", json.GetProperty("inbox").GetProperty("source")
-            .GetProperty("headers").GetProperty("x-correlation-id")[0].GetString());
+        Assert.Equal(
+            new[] { "inbox", "consumerState", "deadLetter", "entries", "nextJournalId" },
+            json.EnumerateObject().Select(x => x.Name)
+        );
+        Assert.Equal(
+            "object:created:object-1:1",
+            json.GetProperty("inbox").GetProperty("eventId").GetString()
+        );
+        Assert.Equal(
+            Event(1),
+            json.GetProperty("inbox").GetProperty("rawPayload").GetBytesFromBase64()
+        );
+        Assert.Equal(
+            "correlation-1",
+            json.GetProperty("inbox")
+                .GetProperty("source")
+                .GetProperty("headers")
+                .GetProperty("x-correlation-id")[0]
+                .GetString()
+        );
         Assert.Equal(1, json.GetProperty("consumerState").GetProperty("lastSequence").GetInt64());
         Assert.Equal(id, json.GetProperty("deadLetter").GetProperty("id").GetGuid());
-        var entry = Assert.Single(json.GetProperty("entries").EnumerateArray(), x =>
-            x.GetProperty("attempt").ValueKind == JsonValueKind.Object);
-        Assert.Equal(new[] { "journalId", "journal", "attempt", "deadLetter" },
-            entry.EnumerateObject().Select(x => x.Name));
+        var entry = Assert.Single(
+            json.GetProperty("entries").EnumerateArray(),
+            x => x.GetProperty("attempt").ValueKind == JsonValueKind.Object
+        );
+        Assert.Equal(
+            new[] { "journalId", "journal", "attempt", "deadLetter" },
+            entry.EnumerateObject().Select(x => x.Name)
+        );
         Assert.Equal("rejected", entry.GetProperty("attempt").GetProperty("outcome").GetString());
-        Assert.Equal(42, entry.GetProperty("attempt").GetProperty("details").GetProperty("profile_id").GetInt32());
-        Assert.Equal(42, entry.GetProperty("attempt").GetProperty("diagnostics")[0]
-            .GetProperty("details").GetProperty("profile_id").GetInt32());
-        Assert.Equal("rejected", entry.GetProperty("journal").GetProperty("details").GetProperty("code").GetString());
-        Assert.True(entry.GetProperty("journal").GetProperty("details").GetProperty("cursorAdvanced").GetBoolean());
+        Assert.Equal(
+            42,
+            entry.GetProperty("attempt").GetProperty("details").GetProperty("profile_id").GetInt32()
+        );
+        Assert.Equal(
+            42,
+            entry
+                .GetProperty("attempt")
+                .GetProperty("diagnostics")[0]
+                .GetProperty("details")
+                .GetProperty("profile_id")
+                .GetInt32()
+        );
+        Assert.Equal(
+            "rejected",
+            entry.GetProperty("journal").GetProperty("details").GetProperty("code").GetString()
+        );
+        Assert.True(
+            entry
+                .GetProperty("journal")
+                .GetProperty("details")
+                .GetProperty("cursorAdvanced")
+                .GetBoolean()
+        );
         Assert.Equal(id, entry.GetProperty("deadLetter").GetProperty("id").GetGuid());
-        var restored = JsonSerializer.Deserialize<InboxHistoryPage>(JsonSerializer.Serialize(page))!;
-        Assert.Equal(page.Entries.Select(x => x.JournalId), restored.Entries.Select(x => x.JournalId));
-        Assert.Equal(page.DeadLetter!.Value.GetProperty("id").GetGuid(),
-            restored.DeadLetter!.Value.GetProperty("id").GetGuid());
+        var restored = JsonSerializer.Deserialize<InboxHistoryPage>(
+            JsonSerializer.Serialize(page)
+        )!;
+        Assert.Equal(
+            page.Entries.Select(x => x.JournalId),
+            restored.Entries.Select(x => x.JournalId)
+        );
+        Assert.Equal(
+            page.DeadLetter!.Value.GetProperty("id").GetGuid(),
+            restored.DeadLetter!.Value.GetProperty("id").GetGuid()
+        );
     }
 
     [Fact]
@@ -69,7 +115,10 @@ public sealed partial class ProcessingTests
         var page = (await HistoryAsync(host, first.DlqId!.Value, pageSize: 1))!;
         Assert.Null(page.Inbox);
         Assert.Null(page.ConsumerState);
-        Assert.Equal(invalid, Convert.FromBase64String(page.DeadLetter!.Value.GetProperty("rawPayload").GetString()!));
+        Assert.Equal(
+            invalid,
+            Convert.FromBase64String(page.DeadLetter!.Value.GetProperty("rawPayload").GetString()!)
+        );
         Assert.Single(page.Entries);
         Assert.Null(page.Entries[0].Attempt);
         Assert.NotNull(page.NextJournalId);
@@ -93,7 +142,9 @@ public sealed partial class ProcessingTests
         await SeedAsync(host, 1, "other");
         Assert.True(await ProcessAsync(host));
         Assert.True(await ProcessAsync(host));
-        var id = await ScalarAsync<Guid>($"SELECT id FROM \"{_schema}\".inbox WHERE object_key = 'object-1'");
+        var id = await ScalarAsync<Guid>(
+            $"SELECT id FROM \"{_schema}\".inbox WHERE object_key = 'object-1'"
+        );
         await using var scope = host.Services.CreateAsyncScope();
         var api = scope.ServiceProvider.GetRequiredService<InboxAdministration<TestDb>>();
         var journals = new List<long>();
@@ -102,15 +153,23 @@ public sealed partial class ProcessingTests
         {
             var page = (await api.ReadHistoryAsync(id, cursor.Value, 2, Token))!;
             Assert.Equal(id, page.Inbox!.Value.GetProperty("id").GetGuid());
-            Assert.Equal("object-1", page.ConsumerState!.Value.GetProperty("objectKey").GetString());
-            Assert.All(page.Entries, entry => Assert.Equal(id, entry.Journal.GetProperty("inboxId").GetGuid()));
+            Assert.Equal(
+                "object-1",
+                page.ConsumerState!.Value.GetProperty("objectKey").GetString()
+            );
+            Assert.All(
+                page.Entries,
+                entry => Assert.Equal(id, entry.Journal.GetProperty("inboxId").GetGuid())
+            );
             journals.AddRange(page.Entries.Select(x => x.JournalId));
             cursor = page.NextJournalId;
         } while (cursor is not null);
         Assert.Equal(5, journals.Count);
         Assert.Equal(journals, journals.Distinct().Order());
         Assert.NotNull(await api.ReadHistoryAsync(id, long.MaxValue, cancellationToken: Token));
-        Assert.Empty((await api.ReadHistoryAsync(id, long.MaxValue, cancellationToken: Token))!.Entries);
+        Assert.Empty(
+            (await api.ReadHistoryAsync(id, long.MaxValue, cancellationToken: Token))!.Entries
+        );
     }
 
     [Theory]
@@ -143,7 +202,12 @@ public sealed partial class ProcessingTests
         );
     }
 
-    private async Task<InboxHistoryPage?> HistoryAsync(IHost host, Guid id, long after = 0, int pageSize = 50)
+    private async Task<InboxHistoryPage?> HistoryAsync(
+        IHost host,
+        Guid id,
+        long after = 0,
+        int pageSize = 50
+    )
     {
         await using var scope = host.Services.CreateAsyncScope();
         return await scope

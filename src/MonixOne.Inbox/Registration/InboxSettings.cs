@@ -3,22 +3,34 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MonixOne.Inbox.Registration;
 
-internal sealed record InboxSettings(string Schema, bool AutoMigrate, InboxCleanupSettings HistoryCleanup);
+internal sealed record InboxSettings(
+    string Schema,
+    bool AutoMigrate,
+    InboxCleanupSettings HistoryCleanup
+);
 
 internal sealed record InboxCleanupSettings(
-    bool Enabled, TimeSpan CompletedRetention, TimeSpan DeadLetterRetention, TimeSpan Interval, int BatchSize)
+    bool Enabled,
+    TimeSpan CompletedRetention,
+    TimeSpan DeadLetterRetention,
+    TimeSpan Interval,
+    int BatchSize
+)
 {
     internal static InboxCleanupSettings Defaults { get; } =
         new(true, TimeSpan.FromDays(30), TimeSpan.FromDays(90), TimeSpan.FromHours(1), 500);
 
-    internal InboxCleanupSettings Apply(InboxHistoryCleanupOptions? o) => o is null ? this : this with
-    {
-        Enabled = o.Enabled ?? Enabled,
-        CompletedRetention = o.CompletedRetention ?? CompletedRetention,
-        DeadLetterRetention = o.DeadLetterRetention ?? DeadLetterRetention,
-        Interval = o.Interval ?? Interval,
-        BatchSize = o.BatchSize ?? BatchSize,
-    };
+    internal InboxCleanupSettings Apply(InboxHistoryCleanupOptions? o) =>
+        o is null
+            ? this
+            : this with
+            {
+                Enabled = o.Enabled ?? Enabled,
+                CompletedRetention = o.CompletedRetention ?? CompletedRetention,
+                DeadLetterRetention = o.DeadLetterRetention ?? DeadLetterRetention,
+                Interval = o.Interval ?? Interval,
+                BatchSize = o.BatchSize ?? BatchSize,
+            };
 }
 
 internal sealed record InboxProcessingSettings(
@@ -29,31 +41,47 @@ internal sealed record InboxProcessingSettings(
     TimeSpan GapTimeout,
     int IntakeConcurrency,
     InboxRetrySettings Retry,
-    Func<Exception, InboxResult>? ClassifyException)
+    Func<Exception, InboxResult>? ClassifyException
+)
 {
-    internal static InboxProcessingSettings Defaults { get; } = new(
-        4, TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(1),
-        TimeSpan.FromSeconds(5), 4, new(5, TimeSpan.FromSeconds(1), TimeSpan.FromMinutes(1)), null);
+    internal static InboxProcessingSettings Defaults { get; } =
+        new(
+            4,
+            TimeSpan.FromSeconds(30),
+            TimeSpan.FromMilliseconds(250),
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(5),
+            4,
+            new(5, TimeSpan.FromSeconds(1), TimeSpan.FromMinutes(1)),
+            null
+        );
 
-    internal InboxProcessingSettings Apply(InboxProcessingOptions? o) => o is null ? this : this with
-    {
-        MaxParallelObjects = o.MaxParallelObjects ?? MaxParallelObjects,
-        HandlerTimeout = o.HandlerTimeout ?? HandlerTimeout,
-        PollInterval = o.PollInterval ?? PollInterval,
-        StartupReorderWindow = o.StartupReorderWindow ?? StartupReorderWindow,
-        GapTimeout = o.GapTimeout ?? GapTimeout,
-        IntakeConcurrency = o.IntakeConcurrency ?? IntakeConcurrency,
-        Retry = Retry with
-        {
-            MaxAttempts = o.Retry?.MaxAttempts ?? Retry.MaxAttempts,
-            InitialDelay = o.Retry?.InitialDelay ?? Retry.InitialDelay,
-            MaxDelay = o.Retry?.MaxDelay ?? Retry.MaxDelay,
-        },
-        ClassifyException = o.ClassifyException ?? ClassifyException,
-    };
+    internal InboxProcessingSettings Apply(InboxProcessingOptions? o) =>
+        o is null
+            ? this
+            : this with
+            {
+                MaxParallelObjects = o.MaxParallelObjects ?? MaxParallelObjects,
+                HandlerTimeout = o.HandlerTimeout ?? HandlerTimeout,
+                PollInterval = o.PollInterval ?? PollInterval,
+                StartupReorderWindow = o.StartupReorderWindow ?? StartupReorderWindow,
+                GapTimeout = o.GapTimeout ?? GapTimeout,
+                IntakeConcurrency = o.IntakeConcurrency ?? IntakeConcurrency,
+                Retry = Retry with
+                {
+                    MaxAttempts = o.Retry?.MaxAttempts ?? Retry.MaxAttempts,
+                    InitialDelay = o.Retry?.InitialDelay ?? Retry.InitialDelay,
+                    MaxDelay = o.Retry?.MaxDelay ?? Retry.MaxDelay,
+                },
+                ClassifyException = o.ClassifyException ?? ClassifyException,
+            };
 }
 
-internal sealed record InboxRetrySettings(int MaxAttempts, TimeSpan InitialDelay, TimeSpan MaxDelay);
+internal sealed record InboxRetrySettings(
+    int MaxAttempts,
+    TimeSpan InitialDelay,
+    TimeSpan MaxDelay
+);
 
 /// <summary>
 /// Эффективные транспортные параметры подписки; бизнес-настройки принадлежат handler.

@@ -92,7 +92,11 @@ public sealed record InboxResult
     /// <summary>
     /// Пропуск с причиной; бизнес-транзакция откатывается, номер закрывается.
     /// </summary>
-    public static InboxResult Ignore(string reason, string code = "ignored", JsonElement? details = null)
+    public static InboxResult Ignore(
+        string reason,
+        string code = "ignored",
+        JsonElement? details = null
+    )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
         return new(InboxResultKind.Ignore, code, reason, details: details);
@@ -110,7 +114,10 @@ public sealed record InboxResult
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
         if (retryAfter <= TimeSpan.Zero)
-            throw new ArgumentOutOfRangeException(nameof(retryAfter), "Retry delay must be positive.");
+            throw new ArgumentOutOfRangeException(
+                nameof(retryAfter),
+                "Retry delay must be positive."
+            );
 
         return new(InboxResultKind.Retry, code, reason, retryAfter, details);
     }
@@ -118,7 +125,11 @@ public sealed record InboxResult
     /// <summary>
     /// Окончательная ошибка с причиной; номер закрывается, поток продолжает работу.
     /// </summary>
-    public static InboxResult Reject(string reason, string code = "rejected", JsonElement? details = null)
+    public static InboxResult Reject(
+        string reason,
+        string code = "rejected",
+        JsonElement? details = null
+    )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
         return new(InboxResultKind.Reject, code, reason, details: details);

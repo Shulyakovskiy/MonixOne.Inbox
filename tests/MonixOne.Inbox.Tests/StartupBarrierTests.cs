@@ -38,7 +38,9 @@ public sealed class StartupBarrierTests
     public async Task Canceling_one_waiter_does_not_cancel_common_readiness()
     {
         var barrier = new InboxStartupBarrier();
-        using var stopping = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        using var stopping = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken
+        );
         var waiting = barrier.WaitAsync(stopping.Token);
         await stopping.CancelAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => waiting);

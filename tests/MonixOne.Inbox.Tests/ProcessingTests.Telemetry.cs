@@ -2,8 +2,8 @@ using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using MonixOne.Inbox.Processing;
 using Microsoft.Extensions.Logging.Abstractions;
+using MonixOne.Inbox.Processing;
 using MonixOne.Inbox.Registration;
 using Npgsql;
 
@@ -18,7 +18,8 @@ public sealed partial class ProcessingTests
         var host = HostFor();
         await SeedAsync(host, 1);
         await SeedAsync(host, 1);
-        _probe.Handle = (_, _, _) => Task.FromResult(InboxResult.Retry("Temporary", TimeSpan.FromMilliseconds(1)));
+        _probe.Handle = (_, _, _) =>
+            Task.FromResult(InboxResult.Retry("Temporary", TimeSpan.FromMilliseconds(1)));
         Assert.True(await ProcessAsync(host));
         await Task.Delay(5, Token);
         _probe.Handle = (_, _, _) => Task.FromResult(InboxResult.Applied);
@@ -29,7 +30,10 @@ public sealed partial class ProcessingTests
         foreach (var decision in new[] { "duplicate", "retry", "applied", "ignored" })
             Assert.Single(
                 capture.Records,
-                m => m.Name == "monixone.inbox.decisions" && m.Tags["decision"] is string d && d == decision
+                m =>
+                    m.Name == "monixone.inbox.decisions"
+                    && m.Tags["decision"] is string d
+                    && d == decision
             );
         Assert.Equal(3, capture.Records.Count(m => m.Name == "monixone.inbox.processing.duration"));
         Assert.Equal(3, capture.Records.Count(m => m.Name == "monixone.inbox.processing.delay"));
@@ -66,7 +70,10 @@ public sealed partial class ProcessingTests
         );
         await Assert.ThrowsAsync<PostgresException>(() => ProcessAsync(host));
         Assert.DoesNotContain(capture.Records, m => m.Name == "monixone.inbox.processing.duration");
-        Assert.DoesNotContain(capture.Records, m => m.Tags.GetValueOrDefault("decision") is "applied");
+        Assert.DoesNotContain(
+            capture.Records,
+            m => m.Tags.GetValueOrDefault("decision") is "applied"
+        );
         Assert.Equal(0, await BusinessCountAsync());
         await SqlAsync($"DROP TRIGGER fail_metrics_test ON \"{_schema}\".inbox_journal");
         Assert.True(await ProcessAsync(host));
@@ -76,7 +83,9 @@ public sealed partial class ProcessingTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Metrics_follow_verified_commit_outcome_without_duplicate_success(bool committed)
+    public async Task Metrics_follow_verified_commit_outcome_without_duplicate_success(
+        bool committed
+    )
     {
         using var capture = new MetricCapture(_schema);
         var failure = new CommitFailure(committed);
@@ -84,7 +93,10 @@ public sealed partial class ProcessingTests
         await SeedAsync(host, 1);
         failure.Armed = true;
         Assert.True(await ProcessAsync(host));
-        Assert.Equal(committed ? 1 : 0, capture.Records.Count(m => m.Tags.GetValueOrDefault("decision") is "applied"));
+        Assert.Equal(
+            committed ? 1 : 0,
+            capture.Records.Count(m => m.Tags.GetValueOrDefault("decision") is "applied")
+        );
         Assert.Equal(!committed, await ProcessAsync(host));
         Assert.Single(capture.Records, m => m.Tags.GetValueOrDefault("decision") is "applied");
         Assert.Single(capture.Records, m => m.Name == "monixone.inbox.processing.duration");
@@ -99,9 +111,13 @@ public sealed partial class ProcessingTests
         Assert.DoesNotContain(capture.Records, x => x.Name == "monixone.inbox.active_messages");
         await SeedAsync(host, 157);
         await SeedAsync(host, 158);
-        var reporter = new InboxMetricsReporter<TestDb>(host.Services.GetRequiredService<IServiceScopeFactory>(),
-            host.Services.GetRequiredService<InboxCatalog<TestDb>>(), host.Services.GetRequiredService<InboxStartupBarrier>(),
-            host.Services.GetRequiredService<InboxMetrics>(), NullLogger<InboxMetricsReporter<TestDb>>.Instance);
+        var reporter = new InboxMetricsReporter<TestDb>(
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            host.Services.GetRequiredService<InboxCatalog<TestDb>>(),
+            host.Services.GetRequiredService<InboxStartupBarrier>(),
+            host.Services.GetRequiredService<InboxMetrics>(),
+            NullLogger<InboxMetricsReporter<TestDb>>.Instance
+        );
         await reporter.RefreshAsync(Token);
         capture.Observe();
         Assert.Equal(2, capture.Last("monixone.inbox.active_messages").Value);
@@ -113,7 +129,12 @@ public sealed partial class ProcessingTests
             Assert.Equal(2, capture.Last("monixone.inbox.active_messages").Value);
             Assert.True(capture.Last("monixone.inbox.state_snapshot.age").Value > 0);
         }
-        finally { await SqlAsync($"ALTER TABLE \"{_schema}\".inbox_temporarily_unavailable RENAME TO inbox"); }
+        finally
+        {
+            await SqlAsync(
+                $"ALTER TABLE \"{_schema}\".inbox_temporarily_unavailable RENAME TO inbox"
+            );
+        }
     }
 
     private sealed record MetricRecord(string Name, double Value, Dictionary<string, object?> Tags);
@@ -130,8 +151,12 @@ public sealed partial class ProcessingTests
                 if (instrument.Meter.Name == InboxTelemetry.MeterName)
                     listener.EnableMeasurementEvents(instrument);
             };
-            _listener.SetMeasurementEventCallback<long>((i, v, tags, _) => Capture(i, v, tags, schema));
-            _listener.SetMeasurementEventCallback<double>((i, v, tags, _) => Capture(i, v, tags, schema));
+            _listener.SetMeasurementEventCallback<long>(
+                (i, v, tags, _) => Capture(i, v, tags, schema)
+            );
+            _listener.SetMeasurementEventCallback<double>(
+                (i, v, tags, _) => Capture(i, v, tags, schema)
+            );
             _listener.Start();
         }
 

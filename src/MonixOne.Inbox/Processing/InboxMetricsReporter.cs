@@ -76,7 +76,9 @@ internal sealed class InboxMetricsReporter<TDbContext>(
             new(
                 catalog.Settings.Schema,
                 DateTimeOffset.UtcNow,
-                handlers.Select(id => states.SingleOrDefault(x => x.HandlerId == id) ?? new(id, 0)).ToArray()
+                handlers
+                    .Select(id => states.SingleOrDefault(x => x.HandlerId == id) ?? new(id, 0))
+                    .ToArray()
             )
         );
     }

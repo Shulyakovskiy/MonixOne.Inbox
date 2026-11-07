@@ -59,4 +59,3 @@ public sealed record InboxHistoryEntry(
     [property: JsonPropertyName("attempt")] JsonElement? Attempt,
     [property: JsonPropertyName("deadLetter")] JsonElement? DeadLetter
 );
-

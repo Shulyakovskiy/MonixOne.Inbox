@@ -21,7 +21,8 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
 
     public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
-    public async ValueTask DisposeAsync() => await ExecuteAsync($"DROP SCHEMA IF EXISTS \"{_schema}\" CASCADE");
+    public async ValueTask DisposeAsync() =>
+        await ExecuteAsync($"DROP SCHEMA IF EXISTS \"{_schema}\" CASCADE");
 
     [Fact]
     public async Task Three_concurrent_hosts_create_schema_once_before_workers_start()
@@ -31,17 +32,30 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
         {
             await Task.WhenAll(hosts.Select(h => h.StartAsync(Token)));
             await Task.WhenAll(
-                hosts.Select(h => h.Services.GetRequiredService<ProbeWorker>().Ready.Task.WaitAsync(Token))
+                hosts.Select(h =>
+                    h.Services.GetRequiredService<ProbeWorker>().Ready.Task.WaitAsync(Token)
+                )
             );
-            Assert.Equal(3L, await ScalarAsync<long>($"SELECT count(*) FROM \"{_schema}\".schema_migrations"));
+            Assert.Equal(
+                3L,
+                await ScalarAsync<long>($"SELECT count(*) FROM \"{_schema}\".schema_migrations")
+            );
             Assert.Equal(
                 6L,
-                await ScalarAsync<long>("SELECT count(*) FROM information_schema.tables WHERE table_schema = @schema")
+                await ScalarAsync<long>(
+                    "SELECT count(*) FROM information_schema.tables WHERE table_schema = @schema"
+                )
             );
-            Assert.False(await ScalarAsync<bool>("SELECT to_regclass('public.\"__EFMigrationsHistory\"') IS NOT NULL"));
+            Assert.False(
+                await ScalarAsync<bool>(
+                    "SELECT to_regclass('public.\"__EFMigrationsHistory\"') IS NOT NULL"
+                )
+            );
             Assert.Equal(
                 InboxMigration.Initial.Checksum,
-                await ScalarAsync<string>($"SELECT checksum FROM \"{_schema}\".schema_migrations WHERE version = 1")
+                await ScalarAsync<string>(
+                    $"SELECT checksum FROM \"{_schema}\".schema_migrations WHERE version = 1"
+                )
             );
         }
         finally
@@ -77,7 +91,9 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
         await host.StopAsync(Token);
         Assert.Equal(
             applied,
-            await ScalarAsync<DateTime>($"SELECT applied_at FROM \"{_schema}\".schema_migrations WHERE version = 1")
+            await ScalarAsync<DateTime>(
+                $"SELECT applied_at FROM \"{_schema}\".schema_migrations WHERE version = 1"
+            )
         );
     }
 
@@ -85,7 +101,9 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
     public async Task Auto_migrate_disabled_does_not_create_a_missing_schema()
     {
         using var host = CreateHost(autoMigrate: false);
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync(Token));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.StartAsync(Token)
+        );
         Assert.Contains("not installed", error.Message);
         Assert.False(await SchemaExistsAsync());
         Assert.False(host.Services.GetRequiredService<ProbeWorker>().Started);
@@ -103,9 +121,14 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
         await InstallAsync();
         await ExecuteAsync($"DELETE FROM \"{_schema}\".schema_migrations");
         using var host = CreateHost(autoMigrate: false);
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync(Token));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.StartAsync(Token)
+        );
         Assert.Contains("requires migration", error.Message);
-        Assert.Equal(0L, await ScalarAsync<long>($"SELECT count(*) FROM \"{_schema}\".schema_migrations"));
+        Assert.Equal(
+            0L,
+            await ScalarAsync<long>($"SELECT count(*) FROM \"{_schema}\".schema_migrations")
+        );
         Assert.False(host.Services.GetRequiredService<ProbeWorker>().Started);
     }
 
@@ -113,9 +136,13 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
     public async Task Modified_checksum_prevents_startup_without_rewriting_history()
     {
         await InstallAsync();
-        await ExecuteAsync($"UPDATE \"{_schema}\".schema_migrations SET checksum = repeat('0', 64)");
+        await ExecuteAsync(
+            $"UPDATE \"{_schema}\".schema_migrations SET checksum = repeat('0', 64)"
+        );
         using var host = CreateHost();
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync(Token));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.StartAsync(Token)
+        );
         Assert.Contains("checksum", error.Message);
         Assert.Equal(
             new string('0', 64),
@@ -130,21 +157,30 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
         await InstallAsync();
         await ExecuteAsync($"DELETE FROM \"{_schema}\".schema_migrations WHERE version = 2");
         using var host = CreateHost();
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync(Token));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.StartAsync(Token)
+        );
         Assert.Contains("noncontiguous", error.Message);
     }
 
     [Theory]
     [InlineData("ALTER TABLE {schema}.inbox DROP COLUMN raw_payload", "inbox.raw_payload")]
-    [InlineData("ALTER TABLE {schema}.inbox ALTER COLUMN attempt_count TYPE bigint", "inbox.attempt_count")]
+    [InlineData(
+        "ALTER TABLE {schema}.inbox ALTER COLUMN attempt_count TYPE bigint",
+        "inbox.attempt_count"
+    )]
     [InlineData("ALTER TABLE {schema}.inbox DROP CONSTRAINT inbox_event_uk", "inbox_event_uk")]
     [InlineData("DROP INDEX {schema}.inbox_active_head_idx", "inbox_active_head_idx")]
     public async Task A_changed_schema_contract_prevents_startup(string mutation, string missing)
     {
         await InstallAsync();
-        await ExecuteAsync(mutation.Replace("{schema}", $"\"{_schema}\"", StringComparison.Ordinal));
+        await ExecuteAsync(
+            mutation.Replace("{schema}", $"\"{_schema}\"", StringComparison.Ordinal)
+        );
         using var host = CreateHost(autoMigrate: false);
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync(Token));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.StartAsync(Token)
+        );
         Assert.Contains(missing, error.Message);
         Assert.False(host.Services.GetRequiredService<ProbeWorker>().Started);
     }
@@ -152,16 +188,28 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
     [Fact]
     public async Task Migration_failure_rolls_back_all_new_ddl_and_history()
     {
-        await ExecuteAsync($"CREATE SCHEMA \"{_schema}\"; CREATE TABLE \"{_schema}\".inbox (existing_data text)");
+        await ExecuteAsync(
+            $"CREATE SCHEMA \"{_schema}\"; CREATE TABLE \"{_schema}\".inbox (existing_data text)"
+        );
         using var host = CreateHost();
         var error = await Assert.ThrowsAnyAsync<Exception>(() => host.StartAsync(Token));
         Assert.Equal(
             PostgresErrorCodes.DuplicateTable,
             Assert.IsType<PostgresException>(error.GetBaseException()).SqlState
         );
-        Assert.False(await ScalarAsync<bool>($"SELECT to_regclass('\"{_schema}\".schema_migrations') IS NOT NULL"));
-        Assert.False(await ScalarAsync<bool>($"SELECT to_regclass('\"{_schema}\".consumer_state') IS NOT NULL"));
-        Assert.True(await ScalarAsync<bool>($"SELECT to_regclass('\"{_schema}\".inbox') IS NOT NULL"));
+        Assert.False(
+            await ScalarAsync<bool>(
+                $"SELECT to_regclass('\"{_schema}\".schema_migrations') IS NOT NULL"
+            )
+        );
+        Assert.False(
+            await ScalarAsync<bool>(
+                $"SELECT to_regclass('\"{_schema}\".consumer_state') IS NOT NULL"
+            )
+        );
+        Assert.True(
+            await ScalarAsync<bool>($"SELECT to_regclass('\"{_schema}\".inbox') IS NOT NULL")
+        );
         Assert.False(host.Services.GetRequiredService<ProbeWorker>().Started);
     }
 
@@ -171,8 +219,15 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync(Token);
         await using var transaction = await connection.BeginTransactionAsync(Token);
-        await using var command = new NpgsqlCommand("SELECT pg_advisory_xact_lock(@key)", connection, transaction);
-        command.Parameters.AddWithValue("key", InboxSchemaMigrator.LockKey(connection.Database, _schema));
+        await using var command = new NpgsqlCommand(
+            "SELECT pg_advisory_xact_lock(@key)",
+            connection,
+            transaction
+        );
+        command.Parameters.AddWithValue(
+            "key",
+            InboxSchemaMigrator.LockKey(connection.Database, _schema)
+        );
         await command.ExecuteNonQueryAsync(Token);
 
         using var stopping = CancellationTokenSource.CreateLinkedTokenSource(Token);
@@ -185,7 +240,10 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
             )
         )
         {
-            Assert.True(timeout.Elapsed < TimeSpan.FromSeconds(10), "Startup did not wait for the advisory lock.");
+            Assert.True(
+                timeout.Elapsed < TimeSpan.FromSeconds(10),
+                "Startup did not wait for the advisory lock."
+            );
             await Task.Delay(TimeSpan.FromMilliseconds(20), Token);
         }
 
@@ -202,7 +260,9 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
     {
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
         await connection.OpenAsync(Token);
-        await using var db = new TestDb(new DbContextOptionsBuilder<TestDb>().UseNpgsql(connection).Options);
+        await using var db = new TestDb(
+            new DbContextOptionsBuilder<TestDb>().UseNpgsql(connection).Options
+        );
         LinqToDBForEFTools.Initialize();
         await InboxSchemaMigrator.EnsureReadyAsync(db, _schema, true, NullLogger.Instance, Token);
         Assert.Same(connection, db.Database.GetDbConnection());
@@ -234,7 +294,10 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
         builder.Logging.ClearProviders();
         builder.Services.Configure<HostOptions>(o => o.ServicesStartConcurrently = true);
         builder.Services.AddDbContext<TestDb>(o =>
-            o.UseNpgsql(connectionString ?? postgres.ConnectionString, provider => provider.EnableRetryOnFailure())
+            o.UseNpgsql(
+                connectionString ?? postgres.ConnectionString,
+                provider => provider.EnableRetryOnFailure()
+            )
         );
         builder.Services.AddSingleton<INatsConnection>(_ => new NatsConnection(
             NatsOpts.Default with
@@ -251,7 +314,10 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
                 o.Schema = _schema;
                 o.AutoMigrate = autoMigrate;
             })
-            .AddHandler<TestHandler>("locations", h => h.Subscribe("events", "EVENTS", "events.>", "locations"));
+            .AddHandler<TestHandler>(
+                "locations",
+                h => h.Subscribe("events", "EVENTS", "events.>", "locations")
+            );
         return builder.Build();
     }
 
@@ -266,7 +332,9 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
     {
         await InstallAsync();
         await InsertEventAsync("locations", "event-1", 1);
-        var error = await Assert.ThrowsAsync<PostgresException>(() => InsertEventAsync("locations", eventId, sequence));
+        var error = await Assert.ThrowsAsync<PostgresException>(() =>
+            InsertEventAsync("locations", eventId, sequence)
+        );
         Assert.Equal(PostgresErrorCodes.UniqueViolation, error.SqlState);
         Assert.Equal(constraint, error.ConstraintName);
         // Independent logical handlers may consume the same fact and source sequence.
@@ -279,7 +347,10 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
     [InlineData(-1L, "pending")]
     [InlineData(1L, "unknown")]
     [InlineData(1L, "retry")]
-    public async Task Invalid_sequence_status_or_retry_without_a_due_time_is_rejected(long sequence, string status)
+    public async Task Invalid_sequence_status_or_retry_without_a_due_time_is_rejected(
+        long sequence,
+        string status
+    )
     {
         await InstallAsync();
         var error = await Assert.ThrowsAsync<PostgresException>(() =>
@@ -293,7 +364,10 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
     {
         await InstallAsync();
         await InsertEventAsync("locations", "event-max", long.MaxValue);
-        Assert.Equal(long.MaxValue, await ScalarAsync<long>($"SELECT sequence FROM \"{_schema}\".inbox"));
+        Assert.Equal(
+            long.MaxValue,
+            await ScalarAsync<long>($"SELECT sequence FROM \"{_schema}\".inbox")
+        );
     }
 
     [Fact]
@@ -327,7 +401,10 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
             ExecuteAsync($"DELETE FROM \"{_schema}\".inbox_dlq")
         );
         Assert.Equal(PostgresErrorCodes.RestrictViolation, dlq.SqlState);
-        Assert.Equal(1L, await ScalarAsync<long>($"SELECT count(*) FROM \"{_schema}\".inbox_journal"));
+        Assert.Equal(
+            1L,
+            await ScalarAsync<long>($"SELECT count(*) FROM \"{_schema}\".inbox_journal")
+        );
     }
 
     [Fact]
@@ -389,7 +466,9 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
     }
 
     private Task<bool> SchemaExistsAsync() =>
-        ScalarAsync<bool>("SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = @schema)");
+        ScalarAsync<bool>(
+            "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = @schema)"
+        );
 
     private async Task ExecuteAsync(string sql)
     {
@@ -413,10 +492,15 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
     private sealed class TestHandler : IInboxHandler<TestDb>
     {
         public TestHandler() =>
-            throw new InvalidOperationException("Schema startup must not construct business handlers.");
+            throw new InvalidOperationException(
+                "Schema startup must not construct business handlers."
+            );
 
-        public Task<InboxResult> HandleAsync(TestDb db, JsonElement message, CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("Schema startup must not call business handlers.");
+        public Task<InboxResult> HandleAsync(
+            TestDb db,
+            JsonElement message,
+            CancellationToken cancellationToken
+        ) => throw new InvalidOperationException("Schema startup must not call business handlers.");
     }
 
     private sealed class ProbeWorker(
@@ -426,7 +510,8 @@ public sealed partial class MigrationTests(PostgreSqlFixture postgres) : IAsyncL
     ) : BackgroundService
     {
         public bool Started { get; private set; }
-        public TaskCompletionSource Ready { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Ready { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {

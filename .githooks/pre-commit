@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+cd "$(git rev-parse --show-toplevel)"
+
+if ! dotnet csharpier check .; then
+    echo ""
+    echo "CSharpier: проверка не пройдена."
+    echo "Выполни: dotnet csharpier format ."
+    echo "Затем проверь diff и добавь нужные изменения в staging."
+    exit 1
+fi
