@@ -482,7 +482,7 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
                 HostFor(
                     dispatch: true,
                     secondHandler: true,
-                    configure: h => h.StartupReorderWindow = TimeSpan.FromMilliseconds(100)
+                    configure: h => h.StartupReorderWindow = TimeSpan.FromHours(1)
                 )
             )
             .ToArray();
@@ -496,6 +496,10 @@ public sealed partial class ProcessingTests(PostgreSqlFixture infrastructure) : 
                     cancellationToken: Token
                 )
             ).EnsureSuccess();
+        // Intake runs across independent subscriptions; CI may need more than 100 ms to persist all events.
+        // Release the startup window only after the complete sequence is durably available to both handlers.
+        await UntilAsync(async () => await CountAsync("inbox") == 6);
+        await SqlAsync($"UPDATE \"{_schema}\".inbox SET received_at = now() - interval '2 hours'");
         await UntilAsync(async () => await CountAsync("inbox", "status = 'processed'") == 6);
         Assert.Equal(6, await CountAsync("inbox_attempts"));
         Assert.Equal(2, await CountAsync("consumer_state", "last_sequence = 3"));
