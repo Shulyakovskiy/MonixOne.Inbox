@@ -47,7 +47,7 @@ jobs:
         run: >-
           dotnet test --project tests/MonixOne.Inbox.Tests/MonixOne.Inbox.Tests.csproj
           --configuration Release --no-build --no-restore --
-          --minimum-expected-tests 183 --no-ansi --progress off
+          --minimum-expected-tests 200 --no-ansi --progress off
 
       - name: Pack
         run: >-
