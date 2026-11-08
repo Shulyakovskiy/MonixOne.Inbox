@@ -4,9 +4,12 @@ namespace MonixOne.Inbox.Registration;
 // Hosted-service registration order alone cannot protect concurrent service startup.
 internal sealed class InboxStartupBarrier
 {
-    private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _ready = new(
+        TaskCreationOptions.RunContinuationsAsynchronously
+    );
 
-    internal Task WaitAsync(CancellationToken cancellationToken) => _ready.Task.WaitAsync(cancellationToken);
+    internal Task WaitAsync(CancellationToken cancellationToken) =>
+        _ready.Task.WaitAsync(cancellationToken);
 
     internal void Complete() => _ready.TrySetResult();
 

@@ -23,12 +23,17 @@ internal sealed class InboxDispatcher<TDbContext>(
         var tasks = catalog
             .Handlers.Where(x => x.Enabled)
             .SelectMany(handler =>
-                Enumerable.Range(0, handler.Processing.MaxParallelObjects).Select(_ => RunAsync(handler, stoppingToken))
+                Enumerable
+                    .Range(0, handler.Processing.MaxParallelObjects)
+                    .Select(_ => RunAsync(handler, stoppingToken))
             );
         await Task.WhenAll(tasks);
     }
 
-    private async Task RunAsync(InboxHandlerRegistration<TDbContext> handler, CancellationToken token)
+    private async Task RunAsync(
+        InboxHandlerRegistration<TDbContext> handler,
+        CancellationToken token
+    )
     {
         var failures = 0;
         while (!token.IsCancellationRequested)
@@ -37,7 +42,9 @@ internal sealed class InboxDispatcher<TDbContext>(
             try
             {
                 await using var scope = scopes.CreateAsyncScope();
-                var processor = scope.ServiceProvider.GetRequiredService<InboxProcessor<TDbContext>>();
+                var processor = scope.ServiceProvider.GetRequiredService<
+                    InboxProcessor<TDbContext>
+                >();
                 var processed = await processor.ProcessOneAsync(handler, _worker, token);
                 failures = 0;
                 if (processed)

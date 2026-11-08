@@ -22,12 +22,18 @@ public sealed partial class ProcessingTests
         var restarted = HostFor(configure: h => h.StartupReorderWindow = TimeSpan.FromHours(1));
         Assert.False(await ProcessAsync(restarted));
         Assert.Empty(_probe.Calls);
-        Assert.Equal(1, await CountAsync("consumer_state", "last_sequence IS NULL AND version = 0"));
+        Assert.Equal(
+            1,
+            await CountAsync("consumer_state", "last_sequence IS NULL AND version = 0")
+        );
         await SqlAsync($"UPDATE \"{_schema}\".inbox SET received_at = now() - interval '2 hours'");
         Assert.True(await ProcessAsync(restarted));
         Assert.Equal(157, Assert.Single(_probe.Calls).Sequence);
         Assert.Equal(1, await CountAsync("consumer_state", "last_sequence = 157 AND version = 1"));
-        Assert.Equal(1, await CountAsync("inbox_journal", "decision = 'initial_sequence_selected'"));
+        Assert.Equal(
+            1,
+            await CountAsync("inbox_journal", "decision = 'initial_sequence_selected'")
+        );
         Assert.Equal(0, await CountAsync("inbox_journal", "decision = 'gap_skipped'"));
     }
 
@@ -61,15 +67,29 @@ public sealed partial class ProcessingTests
         Assert.False(await ProcessAsync(host));
         var restarted = HostFor(configure: h => h.GapTimeout = TimeSpan.FromHours(1));
         Assert.False(await ProcessAsync(restarted));
-        await SqlAsync($"UPDATE \"{_schema}\".inbox SET received_at = now() - interval '2 hours' WHERE sequence = 162");
+        await SqlAsync(
+            $"UPDATE \"{_schema}\".inbox SET received_at = now() - interval '2 hours' WHERE sequence = 162"
+        );
         Assert.True(await ProcessAsync(restarted));
-        Assert.Equal(1, await CountAsync("inbox_journal", "decision = 'gap_skipped' AND " +
-            "details ->> 'firstMissing' = '160' AND details ->> 'lastMissing' = '161'"));
+        Assert.Equal(
+            1,
+            await CountAsync(
+                "inbox_journal",
+                "decision = 'gap_skipped' AND "
+                    + "details ->> 'firstMissing' = '160' AND details ->> 'lastMissing' = '161'"
+            )
+        );
         await SeedAsync(restarted, 160);
         var before = _probe.Calls.Count;
         Assert.True(await ProcessAsync(restarted));
         Assert.Equal(before, _probe.Calls.Count);
-        Assert.Equal(1, await CountAsync("inbox", "sequence = 160 AND status = 'skipped' AND code = 'stale_sequence'"));
+        Assert.Equal(
+            1,
+            await CountAsync(
+                "inbox",
+                "sequence = 160 AND status = 'skipped' AND code = 'stale_sequence'"
+            )
+        );
         await SeedAsync(restarted, 163);
         Assert.True(await ProcessAsync(restarted));
         Assert.Equal(1, await CountAsync("consumer_state", "last_sequence = 163"));
@@ -82,16 +102,25 @@ public sealed partial class ProcessingTests
         await SeedAsync(host, 157);
         Assert.True(await ProcessAsync(host));
         await SeedAsync(host, 160);
-        _probe.Handle = (_, _, _) => Task.FromResult(InboxResult.Retry("Wait", TimeSpan.FromHours(1)));
+        _probe.Handle = (_, _, _) =>
+            Task.FromResult(InboxResult.Retry("Wait", TimeSpan.FromHours(1)));
         Assert.True(await ProcessAsync(host));
         Assert.Equal(1, await CountAsync("consumer_state", "last_sequence = 157 AND version = 2"));
         Assert.Equal(0, await CountAsync("inbox_journal", "decision = 'gap_skipped'"));
         _probe.Handle = (_, _, _) => Task.FromResult(InboxResult.Reject("Terminal"));
-        await SqlAsync($"UPDATE \"{_schema}\".inbox SET next_attempt_at = now() - interval '1 second'");
+        await SqlAsync(
+            $"UPDATE \"{_schema}\".inbox SET next_attempt_at = now() - interval '1 second'"
+        );
         Assert.True(await ProcessAsync(host));
         Assert.Equal(1, await CountAsync("consumer_state", "last_sequence = 160 AND version = 3"));
-        Assert.Equal(1, await CountAsync("inbox_journal", "decision = 'gap_skipped' AND " +
-            "details ->> 'firstMissing' = '158' AND details ->> 'lastMissing' = '159'"));
+        Assert.Equal(
+            1,
+            await CountAsync(
+                "inbox_journal",
+                "decision = 'gap_skipped' AND "
+                    + "details ->> 'firstMissing' = '158' AND details ->> 'lastMissing' = '159'"
+            )
+        );
         await SeedAsync(host, 161);
         _probe.Handle = (_, _, _) => Task.FromResult(InboxResult.Applied);
         Assert.True(await ProcessAsync(host));
@@ -100,7 +129,9 @@ public sealed partial class ProcessingTests
     [Fact]
     public async Task Three_replicas_can_invoke_callback_but_only_one_commits_business_outbox_and_attempt()
     {
-        var allEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allEntered = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
         var arrivals = 0;
         _probe.Handle = async (_, _, token) =>
         {
@@ -147,7 +178,10 @@ public sealed partial class ProcessingTests
         Assert.Equal(0, await BusinessCountAsync());
         Assert.Equal(0, await ScalarAsync<long>("SELECT count(*) FROM public.processing_outbox"));
         Assert.Equal(0, await CountAsync("inbox_attempts"));
-        Assert.Equal(1, await CountAsync("consumer_state", "last_sequence IS NULL AND version = 0"));
+        Assert.Equal(
+            1,
+            await CountAsync("consumer_state", "last_sequence IS NULL AND version = 0")
+        );
         _probe.Handle = (_, _, _) => Task.FromResult(InboxResult.Applied);
         for (var i = 0; i < 3; i++)
             Assert.True(await ProcessAsync(host));
@@ -178,11 +212,22 @@ public sealed partial class ProcessingTests
             // Same object intake does not acquire the coordinator row held by a business callback.
             await _js.PublishAsync($"{_subject}.a", Event(158), cancellationToken: Token);
             await _js.PublishAsync($"{_subject}.a", Event(157, "other"), cancellationToken: Token);
-            await UntilAsync(async () => await CountAsync("inbox", "object_key = 'other' AND status = 'processed'") == 1);
-            Assert.Equal(1, await CountAsync("inbox", "object_key = 'object-1' AND sequence = 158 AND status = 'pending'"));
+            await UntilAsync(async () =>
+                await CountAsync("inbox", "object_key = 'other' AND status = 'processed'") == 1
+            );
+            Assert.Equal(
+                1,
+                await CountAsync(
+                    "inbox",
+                    "object_key = 'object-1' AND sequence = 158 AND status = 'pending'"
+                )
+            );
             Assert.Single(_probe.Calls, x => x.Key == "object-1");
         }
-        finally { release.TrySetResult(); }
+        finally
+        {
+            release.TrySetResult();
+        }
         await UntilAsync(async () => await CountAsync("inbox", "status = 'processed'") == 3);
         Assert.Equal(9, await BusinessCountAsync());
     }
@@ -205,7 +250,11 @@ public sealed partial class ProcessingTests
         await using var connection = new NpgsqlConnection(infrastructure.ConnectionString);
         await connection.OpenAsync(Token);
         await using var blocking = await connection.BeginTransactionAsync(Token);
-        await using var command = new NpgsqlCommand($"UPDATE \"{_schema}\".consumer_state SET version = version", connection, blocking);
+        await using var command = new NpgsqlCommand(
+            $"UPDATE \"{_schema}\".consumer_state SET version = version",
+            connection,
+            blocking
+        );
         await command.ExecuteNonQueryAsync(Token);
         release.TrySetResult();
         Assert.False(await processing.WaitAsync(TimeSpan.FromSeconds(5), Token));
@@ -220,10 +269,16 @@ public sealed partial class ProcessingTests
     [InlineData(33)]
     [InlineData(150)]
     [InlineData(1)]
-    public async Task Oversized_or_deep_result_details_never_repeat_an_otherwise_valid_decision(int depth)
+    public async Task Oversized_or_deep_result_details_never_repeat_an_otherwise_valid_decision(
+        int depth
+    )
     {
-        var raw = depth == 1 ? "{\"large\":\"" + new string('x', 100_000) + "\"}" :
-            string.Concat(Enumerable.Repeat("{\"nested\":", depth)) + "42" + new string('}', depth);
+        var raw =
+            depth == 1
+                ? "{\"large\":\"" + new string('x', 100_000) + "\"}"
+                : string.Concat(Enumerable.Repeat("{\"nested\":", depth))
+                    + "42"
+                    + new string('}', depth);
         _probe.Handle = (_, _, _) =>
         {
             using var json = JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 256 });
@@ -234,7 +289,13 @@ public sealed partial class ProcessingTests
         Assert.True(await ProcessAsync(host));
         Assert.False(await ProcessAsync(host));
         Assert.Single(_probe.Calls);
-        Assert.Equal(1, await CountAsync("inbox_attempts", "details ->> 'code' = 'diagnostics.invalid_or_oversized'"));
+        Assert.Equal(
+            1,
+            await CountAsync(
+                "inbox_attempts",
+                "details ->> 'code' = 'diagnostics.invalid_or_oversized'"
+            )
+        );
         Assert.Equal(1, await CountAsync("consumer_state", "last_sequence = 157"));
     }
 
@@ -269,7 +330,9 @@ public sealed partial class ProcessingTests
         Assert.Equal(0, await CleanupAsync(host));
         Assert.Equal(1, await CountAsync("inbox"));
         Assert.Equal(1, await CountAsync("inbox_attempts"));
-        await SqlAsync($"UPDATE \"{_schema}\".inbox_dlq SET created_at = now() - interval '100 days'");
+        await SqlAsync(
+            $"UPDATE \"{_schema}\".inbox_dlq SET created_at = now() - interval '100 days'"
+        );
         Assert.True(await CleanupAsync(host) > 0);
         Assert.Equal(0, await CountAsync("inbox"));
         Assert.Equal(0, await CountAsync("inbox_dlq"));
@@ -285,10 +348,14 @@ public sealed partial class ProcessingTests
         await SeedAsync(host, 157);
         await SeedAsync(host, 157, "other");
         using var json = JsonDocument.Parse(Event(157, "other"));
-        var incoming = json.RootElement.EnumerateObject().ToDictionary(x => x.Name, x => x.Value.Clone());
+        var incoming = json
+            .RootElement.EnumerateObject()
+            .ToDictionary(x => x.Name, x => x.Value.Clone());
         incoming["eventId"] = JsonSerializer.SerializeToElement("object:created:object-1:157");
         await SaveRawAsync(host, JsonSerializer.SerializeToUtf8Bytes(incoming));
-        await SqlAsync($"UPDATE \"{_schema}\".inbox_dlq SET created_at = now() - interval '100 days'");
+        await SqlAsync(
+            $"UPDATE \"{_schema}\".inbox_dlq SET created_at = now() - interval '100 days'"
+        );
         // Conflict history tied to active work must survive; unrelated invalid history can expire.
         Assert.Equal(1, await CleanupAsync(host));
         Assert.Equal(1, await CountAsync("inbox_dlq", "category = 'conflict'"));
@@ -306,7 +373,9 @@ public sealed partial class ProcessingTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task Cleanup_is_idempotent_between_replicas_and_respects_disabled_configuration(bool enabled)
+    public async Task Cleanup_is_idempotent_between_replicas_and_respects_disabled_configuration(
+        bool enabled
+    )
     {
         var host = HostFor(configureGlobal: o => o.HistoryCleanup.Enabled = enabled);
         var replica = HostFor(configureGlobal: o => o.HistoryCleanup.Enabled = enabled);
@@ -329,11 +398,19 @@ public sealed partial class ProcessingTests
         await SeedAsync(host, 159);
         Assert.False(await ProcessAsync(host));
         Assert.Equal(1, await CountAsync("consumer_state", "last_sequence = 157"));
-        await SqlAsync($"UPDATE \"{_schema}\".inbox SET received_at = now() - interval '2 hours' WHERE sequence = 159");
+        await SqlAsync(
+            $"UPDATE \"{_schema}\".inbox SET received_at = now() - interval '2 hours' WHERE sequence = 159"
+        );
         Assert.True(await ProcessAsync(host));
         Assert.Equal(new long[] { 157, 159 }, _probe.Calls.Select(x => x.Sequence));
         Assert.Equal(1, await CountAsync("inbox_dlq", "category = 'invalid_message'"));
-        Assert.Equal(1, await CountAsync("inbox_journal", "decision = 'gap_skipped' AND details ->> 'firstMissing' = '158' AND details ->> 'lastMissing' = '158'"));
+        Assert.Equal(
+            1,
+            await CountAsync(
+                "inbox_journal",
+                "decision = 'gap_skipped' AND details ->> 'firstMissing' = '158' AND details ->> 'lastMissing' = '158'"
+            )
+        );
     }
 
     [Fact]
@@ -342,14 +419,25 @@ public sealed partial class ProcessingTests
         var host = HostFor();
         await SeedAsync(host, 157);
         using var document = JsonDocument.Parse(Event(155));
-        var values = document.RootElement.EnumerateObject().ToDictionary(x => x.Name, x => x.Value.Clone());
+        var values = document
+            .RootElement.EnumerateObject()
+            .ToDictionary(x => x.Name, x => x.Value.Clone());
         values["producer"] = JsonSerializer.SerializeToElement("another-service");
         values["eventId"] = JsonSerializer.SerializeToElement("another-service:object:created:155");
         await SaveRawAsync(host, JsonSerializer.SerializeToUtf8Bytes(values));
         Assert.True(await ProcessAsync(host));
         Assert.True(await ProcessAsync(host));
-        Assert.Equal(1, await CountAsync("consumer_state", "producer = 'service' AND last_sequence = 157"));
-        Assert.Equal(1, await CountAsync("consumer_state", "producer = 'another-service' AND last_sequence = 155"));
+        Assert.Equal(
+            1,
+            await CountAsync("consumer_state", "producer = 'service' AND last_sequence = 157")
+        );
+        Assert.Equal(
+            1,
+            await CountAsync(
+                "consumer_state",
+                "producer = 'another-service' AND last_sequence = 155"
+            )
+        );
         Assert.Equal(6, await BusinessCountAsync());
     }
 
@@ -362,8 +450,17 @@ public sealed partial class ProcessingTests
         Assert.True(await ProcessAsync(host));
         var id = await ScalarAsync<Guid>($"SELECT id FROM \"{_schema}\".inbox_dlq");
         var page = (await HistoryAsync(host, id))!;
-        Assert.Equal(Event(157), Convert.FromBase64String(page.Inbox!.Value.GetProperty("rawPayload").GetString()!));
-        Assert.Equal(1, await CountAsync("inbox_dlq", "envelope IS NULL AND octet_length(raw_payload) = 0 AND source = '{}'::jsonb"));
+        Assert.Equal(
+            Event(157),
+            Convert.FromBase64String(page.Inbox!.Value.GetProperty("rawPayload").GetString()!)
+        );
+        Assert.Equal(
+            1,
+            await CountAsync(
+                "inbox_dlq",
+                "envelope IS NULL AND octet_length(raw_payload) = 0 AND source = '{}'::jsonb"
+            )
+        );
         Assert.Equal("dead", page.Inbox.Value.GetProperty("status").GetString());
     }
 
@@ -371,31 +468,50 @@ public sealed partial class ProcessingTests
     public async Task Background_cleanup_failure_does_not_stop_intake_or_business_processing()
     {
         var logs = new LogCapture();
-        var host = HostFor(logs: logs, configureGlobal: o => o.HistoryCleanup.Interval = TimeSpan.FromMilliseconds(20));
+        var host = HostFor(
+            logs: logs,
+            configureGlobal: o => o.HistoryCleanup.Interval = TimeSpan.FromMilliseconds(20)
+        );
         await SeedAsync(host, 157);
         Assert.True(await ProcessAsync(host));
         await AgeHistoryAsync();
-        await SqlAsync($"""
+        await SqlAsync(
+            $"""
             CREATE FUNCTION "{_schema}".fail_cleanup() RETURNS trigger LANGUAGE plpgsql AS $$
             BEGIN RAISE EXCEPTION 'Temporary database failure during cleanup'; END $$;
             CREATE TRIGGER fail_cleanup BEFORE DELETE ON "{_schema}".inbox
             FOR EACH ROW EXECUTE FUNCTION "{_schema}".fail_cleanup();
-            """);
+            """
+        );
         await host.StartAsync(Token);
-        await UntilAsync(() => Task.FromResult(logs.Records.Any(x => x.Category.Contains("InboxHistoryCleanup", StringComparison.Ordinal))));
+        await UntilAsync(() =>
+            Task.FromResult(
+                logs.Records.Any(x =>
+                    x.Category.Contains("InboxHistoryCleanup", StringComparison.Ordinal)
+                )
+            )
+        );
         await _js.PublishAsync($"{_subject}.a", Event(158), cancellationToken: Token);
         await UntilAsync(async () => await CountAsync("inbox", "sequence = 158") == 1);
         Assert.True(await ProcessAsync(host));
-        Assert.False(host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopped.IsCancellationRequested);
+        Assert.False(
+            host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopped.IsCancellationRequested
+        );
         Assert.Equal(1, await CountAsync("consumer_state", "last_sequence = 158"));
         await SqlAsync($"DROP TRIGGER fail_cleanup ON \"{_schema}\".inbox");
         await UntilAsync(async () => await CountAsync("inbox", "sequence = 157") == 0);
     }
 
-    private Task AgeHistoryAsync() => SqlAsync($"UPDATE \"{_schema}\".inbox SET completed_at = now() - interval '100 days' WHERE completed_at IS NOT NULL");
+    private Task AgeHistoryAsync() =>
+        SqlAsync(
+            $"UPDATE \"{_schema}\".inbox SET completed_at = now() - interval '100 days' WHERE completed_at IS NOT NULL"
+        );
 
-    private Task<int> CleanupAsync(IHost host) => new InboxHistoryCleanup<TestDb>(
-        host.Services.GetRequiredService<IServiceScopeFactory>(), host.Services.GetRequiredService<InboxCatalog<TestDb>>(),
-        host.Services.GetRequiredService<InboxStartupBarrier>(), NullLogger<InboxHistoryCleanup<TestDb>>.Instance)
-        .CleanupBatchAsync(Token);
+    private Task<int> CleanupAsync(IHost host) =>
+        new InboxHistoryCleanup<TestDb>(
+            host.Services.GetRequiredService<IServiceScopeFactory>(),
+            host.Services.GetRequiredService<InboxCatalog<TestDb>>(),
+            host.Services.GetRequiredService<InboxStartupBarrier>(),
+            NullLogger<InboxHistoryCleanup<TestDb>>.Instance
+        ).CleanupBatchAsync(Token);
 }

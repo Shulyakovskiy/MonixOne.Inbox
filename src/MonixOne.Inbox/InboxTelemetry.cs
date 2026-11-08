@@ -20,7 +20,11 @@ public static class InboxTelemetry
 
 internal sealed record InboxStateMeasurement(string HandlerId, long Active);
 
-internal sealed record InboxMetricsSnapshot(string Schema, DateTimeOffset UpdatedAt, InboxStateMeasurement[] States);
+internal sealed record InboxMetricsSnapshot(
+    string Schema,
+    DateTimeOffset UpdatedAt,
+    InboxStateMeasurement[] States
+);
 
 internal sealed class InboxMetrics : IDisposable
 {
@@ -51,7 +55,12 @@ internal sealed class InboxMetrics : IDisposable
         _decisions.Add(1, tags);
     }
 
-    internal void Processing(string schema, InboxRow row, InboxAttemptRow? attempt, string? committedStatus = null)
+    internal void Processing(
+        string schema,
+        InboxRow row,
+        InboxAttemptRow? attempt,
+        string? committedStatus = null
+    )
     {
         var decision = (committedStatus ?? row.Status) switch
         {
@@ -73,7 +82,8 @@ internal sealed class InboxMetrics : IDisposable
         _delay.Record(Math.Max(0, (attempt.StartedAt - row.ReceivedAt).TotalSeconds), tags);
     }
 
-    internal void UpdateSnapshot(InboxMetricsSnapshot snapshot) => Volatile.Write(ref _snapshot, snapshot);
+    internal void UpdateSnapshot(InboxMetricsSnapshot snapshot) =>
+        Volatile.Write(ref _snapshot, snapshot);
 
     private IEnumerable<Measurement<long>> ObserveStates()
     {

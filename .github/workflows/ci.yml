@@ -29,6 +29,11 @@ jobs:
           docker pull postgres:18-alpine
           docker pull nats:2.12-alpine
 
+      - name: Check formatting
+        run: |
+          dotnet tool restore
+          dotnet csharpier check .
+
       - name: Restore
         run: dotnet restore MonixOne.Inbox.sln --disable-parallel
 

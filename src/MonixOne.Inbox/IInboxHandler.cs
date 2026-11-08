@@ -15,5 +15,9 @@ public interface IInboxHandler<in TDbContext>
     /// The same event can invoke this callback concurrently on different replicas; only one transaction commits.
     /// Keep all writes in the supplied context/transaction, honor cancellation and await all work before returning.
     /// </remarks>
-    Task<InboxResult> HandleAsync(TDbContext db, JsonElement message, CancellationToken cancellationToken);
+    Task<InboxResult> HandleAsync(
+        TDbContext db,
+        JsonElement message,
+        CancellationToken cancellationToken
+    );
 }

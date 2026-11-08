@@ -34,7 +34,10 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         _nats = new(NatsOpts.Default with { Url = infrastructure.NatsUrl });
         _js = new(_nats);
         await _js.CreateStreamAsync(
-            new StreamConfig(_stream, [$"{_subject}.>"]) { Retention = StreamConfigRetention.Limits },
+            new StreamConfig(_stream, [$"{_subject}.>"])
+            {
+                Retention = StreamConfigRetention.Limits,
+            },
             cancellationToken: Token
         );
         LinqToDBForEFTools.Initialize();
@@ -61,7 +64,8 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
     {
         var host = HostFor();
         await host.StartAsync(Token);
-        var raw = """
+        var raw =
+            """
             {
               "eventId": "profile:updated:42:157",
               "producer": "profiles",
@@ -75,15 +79,27 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
             """u8.ToArray();
 
         await PublishAsync(raw);
-        await UntilAsync(async () => await CountAsync("inbox_journal", "decision = 'received'") == 1);
+        await UntilAsync(async () =>
+            await CountAsync("inbox_journal", "decision = 'received'") == 1
+        );
 
-        Assert.Equal(1, await CountAsync("inbox",
-            "event_id = 'profile:updated:42:157' AND producer = 'profiles' AND sequence_scope = 'profiles' "
-            + "AND object_key = '42' AND sequence = 157 AND event_type = 'profile.updated' "
-            + "AND occurred_at = '2026-10-09T07:00:00Z'::timestamptz AND envelope -> 'payload' ->> 'name' = 'Example'"));
-        Assert.Equal(raw, await ScalarAsync<byte[]>($"SELECT raw_payload FROM \"{_schema}\".inbox"));
+        Assert.Equal(
+            1,
+            await CountAsync(
+                "inbox",
+                "event_id = 'profile:updated:42:157' AND producer = 'profiles' AND sequence_scope = 'profiles' "
+                    + "AND object_key = '42' AND sequence = 157 AND event_type = 'profile.updated' "
+                    + "AND occurred_at = '2026-10-09T07:00:00Z'::timestamptz AND envelope -> 'payload' ->> 'name' = 'Example'"
+            )
+        );
+        Assert.Equal(
+            raw,
+            await ScalarAsync<byte[]>($"SELECT raw_payload FROM \"{_schema}\".inbox")
+        );
         Assert.Equal(0, await CountAsync("inbox_dlq"));
-        await UntilAsync(async () => (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0);
+        await UntilAsync(async () =>
+            (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0
+        );
     }
 
     [Fact]
@@ -99,14 +115,20 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
             ["x-correlation-id"] = "correlation-1",
         };
         await PublishAsync(raw, headers: headers);
-        await UntilAsync(async () => await CountAsync("inbox_journal", "decision = 'received'") == 2);
+        await UntilAsync(async () =>
+            await CountAsync("inbox_journal", "decision = 'received'") == 2
+        );
         using var json = JsonDocument.Parse(raw);
         var reversed = JsonSerializer.SerializeToUtf8Bytes(
-            json.RootElement.EnumerateObject().Reverse().ToDictionary(x => x.Name, x => x.Value.Clone()),
+            json.RootElement.EnumerateObject()
+                .Reverse()
+                .ToDictionary(x => x.Name, x => x.Value.Clone()),
             new JsonSerializerOptions { WriteIndented = true }
         );
         await PublishAsync(reversed);
-        await UntilAsync(async () => await CountAsync("inbox_journal", "decision = 'duplicate'") == 2);
+        await UntilAsync(async () =>
+            await CountAsync("inbox_journal", "decision = 'duplicate'") == 2
+        );
         Assert.Equal(2, await CountAsync("inbox"));
         Assert.Equal(2, await CountAsync("consumer_state", "last_sequence IS NULL"));
         Assert.Equal(0, await CountAsync("inbox_attempts"));
@@ -123,14 +145,36 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         Assert.Contains("[REDACTED]", source);
         Assert.Contains("correlation-1", source);
         using var sourceJson = JsonDocument.Parse(source);
-        Assert.Equal(new[] { "connection", "stream", "consumer", "domain", "subject", "streamCreatedAt",
-                "streamSequence", "consumerSequence", "deliveryCount", "pending", "publishedAt", "receivedAt", "headers" }
-                .Order(),
-            sourceJson.RootElement.EnumerateObject().Select(x => x.Name).Order());
+        Assert.Equal(
+            new[]
+            {
+                "connection",
+                "stream",
+                "consumer",
+                "domain",
+                "subject",
+                "streamCreatedAt",
+                "streamSequence",
+                "consumerSequence",
+                "deliveryCount",
+                "pending",
+                "publishedAt",
+                "receivedAt",
+                "headers",
+            }.Order(),
+            sourceJson.RootElement.EnumerateObject().Select(x => x.Name).Order()
+        );
         Assert.True(sourceJson.RootElement.GetProperty("streamSequence").GetUInt64() > 0);
-        Assert.Equal("correlation-1",
-            sourceJson.RootElement.GetProperty("headers").GetProperty("x-correlation-id")[0].GetString());
-        await UntilAsync(async () => (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0);
+        Assert.Equal(
+            "correlation-1",
+            sourceJson
+                .RootElement.GetProperty("headers")
+                .GetProperty("x-correlation-id")[0]
+                .GetString()
+        );
+        await UntilAsync(async () =>
+            (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0
+        );
     }
 
     [Fact]
@@ -175,16 +219,26 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         Assert.Equal(1, await CountAsync("consumer_state", "object_key = 'c'"));
         Assert.Equal(
             2,
-            await CountAsync("inbox_journal", "decision = 'conflict' AND inbox_id IS NOT NULL AND dlq_id IS NOT NULL")
+            await CountAsync(
+                "inbox_journal",
+                "decision = 'conflict' AND inbox_id IS NOT NULL AND dlq_id IS NOT NULL"
+            )
         );
-        Assert.Equal(conflicting, await ScalarAsync<byte[]>($"SELECT raw_payload FROM \"{_schema}\".inbox_dlq"));
-        await UntilAsync(async () => (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0);
+        Assert.Equal(
+            conflicting,
+            await ScalarAsync<byte[]>($"SELECT raw_payload FROM \"{_schema}\".inbox_dlq")
+        );
+        await UntilAsync(async () =>
+            (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0
+        );
     }
 
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task Same_id_with_changed_payload_or_different_id_at_same_sequence_is_a_conflict(bool sameId)
+    public async Task Same_id_with_changed_payload_or_different_id_at_same_sequence_is_a_conflict(
+        bool sameId
+    )
     {
         var host = HostFor();
         await host.StartAsync(Token);
@@ -193,7 +247,10 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         await UntilAsync(async () => await CountAsync("inbox") == 1);
         await PublishAsync(Event(sameId ? "created-1" : "other-1", 1, value: 42));
         await UntilAsync(async () => await CountAsync("inbox_dlq") == 1);
-        Assert.Equal(original, await ScalarAsync<byte[]>($"SELECT raw_payload FROM \"{_schema}\".inbox"));
+        Assert.Equal(
+            original,
+            await ScalarAsync<byte[]>($"SELECT raw_payload FROM \"{_schema}\".inbox")
+        );
         Assert.Equal(1, await CountAsync("consumer_state", "last_sequence IS NULL"));
     }
 
@@ -211,10 +268,15 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         var raw = Encoding.UTF8.GetBytes(json);
         await PublishAsync(raw);
         await UntilAsync(async () => await CountAsync("inbox_dlq") == 1);
-        Assert.Equal(raw, await ScalarAsync<byte[]>($"SELECT raw_payload FROM \"{_schema}\".inbox_dlq"));
+        Assert.Equal(
+            raw,
+            await ScalarAsync<byte[]>($"SELECT raw_payload FROM \"{_schema}\".inbox_dlq")
+        );
         Assert.Equal(0, await CountAsync("consumer_state"));
         Assert.Equal(0, await CountAsync("inbox"));
-        await UntilAsync(async () => (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0);
+        await UntilAsync(async () =>
+            (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0
+        );
     }
 
     [Theory]
@@ -239,13 +301,21 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         {
             await scope
                 .ServiceProvider.GetRequiredService<InboxIntakeStore<TestDb>>()
-                .SaveAsync(handler, Assert.Single(handler.Subscriptions), delivery, "interrupted-worker", Token);
+                .SaveAsync(
+                    handler,
+                    Assert.Single(handler.Subscriptions),
+                    delivery,
+                    "interrupted-worker",
+                    Token
+                );
         }
         await host.StartAsync(Token);
         await UntilAsync(async () => await CountAsync("inbox_journal") >= 2);
         Assert.Equal(valid ? 1 : 0, await CountAsync("inbox"));
         Assert.Equal(valid ? 0 : 1, await CountAsync("inbox_dlq"));
-        await UntilAsync(async () => (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0);
+        await UntilAsync(async () =>
+            (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0
+        );
     }
 
     [Fact]
@@ -266,13 +336,20 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         var host = HostFor(connectionString: cs);
         await host.StartAsync(Token);
         await PublishAsync(Event("created-1", 1));
-        await UntilAsync(async () => (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumRedelivered > 0);
+        await UntilAsync(async () =>
+            (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumRedelivered > 0
+        );
         Assert.Equal(0, await CountAsync("inbox"));
         Assert.Equal(0, await CountAsync("consumer_state")); // Failed transaction rolled back its state insert too.
-        Assert.Equal(1, (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending);
+        Assert.Equal(
+            1,
+            (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending
+        );
         await SqlAsync($"GRANT INSERT ON \"{_schema}\".inbox TO inbox_reader");
         await UntilAsync(async () => await CountAsync("inbox") == 1);
-        await UntilAsync(async () => (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0);
+        await UntilAsync(async () =>
+            (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0
+        );
     }
 
     [Fact]
@@ -288,7 +365,9 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
             Token
         );
         var host = HostFor();
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync(Token));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.StartAsync(Token)
+        );
         Assert.Contains("incompatible", error.Message);
         Assert.Equal(
             ConsumerConfigAckPolicy.None,
@@ -307,17 +386,29 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         });
         await host.StartAsync(Token);
         using var standard = JsonDocument.Parse(Event("created-157", 157));
-        var raw = JsonSerializer.SerializeToUtf8Bytes(new { metadata = standard.RootElement, body = new { value = 99 } });
+        var raw = JsonSerializer.SerializeToUtf8Bytes(
+            new { metadata = standard.RootElement, body = new { value = 99 } }
+        );
         await PublishAsync(raw);
         await UntilAsync(async () => await CountAsync("inbox") == 1);
-        Assert.Equal(raw, await ScalarAsync<byte[]>($"SELECT raw_payload FROM \"{_schema}\".inbox"));
-        Assert.Equal(1, await CountAsync("inbox", "sequence = 157 AND envelope -> 'body' ->> 'value' = '99'"));
+        Assert.Equal(
+            raw,
+            await ScalarAsync<byte[]>($"SELECT raw_payload FROM \"{_schema}\".inbox")
+        );
+        Assert.Equal(
+            1,
+            await CountAsync("inbox", "sequence = 157 AND envelope -> 'body' ->> 'value' = '99'")
+        );
         Assert.Single(contexts);
-        await UntilAsync(async () => (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0);
+        await UntilAsync(async () =>
+            (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0
+        );
     }
 
-    private sealed class TestEnvelopeAdapter(TestDb db,
-        System.Collections.Concurrent.ConcurrentQueue<TestDb> contexts) : IInboxEnvelopeAdapter
+    private sealed class TestEnvelopeAdapter(
+        TestDb db,
+        System.Collections.Concurrent.ConcurrentQueue<TestDb> contexts
+    ) : IInboxEnvelopeAdapter
     {
         public InboxEventMetadata Extract(JsonElement message)
         {
@@ -325,10 +416,15 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
             // The adapter itself is scoped, and its dependencies come from this exact intake operation.
             Assert.Null(db.Database.CurrentTransaction);
             var original = message.GetProperty("metadata");
-            return new(original.GetProperty("eventId").GetString()!, original.GetProperty("producer").GetString()!,
-                original.GetProperty("sequenceScope").GetString()!, original.GetProperty("objectKey").GetString()!,
-                original.GetProperty("sequence").GetInt64(), original.GetProperty("eventType").GetString()!,
-                original.GetProperty("occurredAt").GetDateTimeOffset());
+            return new(
+                original.GetProperty("eventId").GetString()!,
+                original.GetProperty("producer").GetString()!,
+                original.GetProperty("sequenceScope").GetString()!,
+                original.GetProperty("objectKey").GetString()!,
+                original.GetProperty("sequence").GetInt64(),
+                original.GetProperty("eventType").GetString()!,
+                original.GetProperty("occurredAt").GetDateTimeOffset()
+            );
         }
     }
 
@@ -361,14 +457,21 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
                 id,
                 h =>
                 {
-                    h.Subscribe("events", _stream, twoSubscriptions ? $"{_subject}.a" : $"{_subject}.>", id);
+                    h.Subscribe(
+                        "events",
+                        _stream,
+                        twoSubscriptions ? $"{_subject}.a" : $"{_subject}.>",
+                        id
+                    );
                     if (twoSubscriptions)
                         h.Subscribe("other", _stream, $"{_subject}.b", $"{id}-other");
                     configure?.Invoke(id, h);
                 }
             );
         // These tests isolate persistence/ACK. Dispatcher behavior has its own integration coverage.
-        builder.Services.Remove(builder.Services.Single(d => d.ImplementationType == typeof(InboxDispatcher<TestDb>)));
+        builder.Services.Remove(
+            builder.Services.Single(d => d.ImplementationType == typeof(InboxDispatcher<TestDb>))
+        );
         configureServices?.Invoke(builder.Services);
         var host = builder.Build();
         _hosts.Add(host);
@@ -388,7 +491,9 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         await UntilAsync(async () => await CountAsync("inbox_dlq") == 20);
         Assert.Equal(20, await CountAsync("inbox"));
         Assert.Equal(40, await CountAsync("consumer_state", "last_sequence IS NULL"));
-        await UntilAsync(async () => (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0);
+        await UntilAsync(async () =>
+            (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0
+        );
     }
 
     [Fact]
@@ -396,13 +501,21 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
     {
         await _js.DeleteStreamAsync(_stream, Token);
         await _js.CreateStreamAsync(
-            new StreamConfig(_stream, [$"{_subject}.>"]) { Retention = StreamConfigRetention.Workqueue },
+            new StreamConfig(_stream, [$"{_subject}.>"])
+            {
+                Retention = StreamConfigRetention.Workqueue,
+            },
             cancellationToken: Token
         );
         var host = HostFor();
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync(Token));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.StartAsync(Token)
+        );
         Assert.Contains("WorkQueue", error.Message);
-        Assert.Equal(0, (await _js.GetStreamAsync(_stream, cancellationToken: Token)).Info.State.ConsumerCount);
+        Assert.Equal(
+            0,
+            (await _js.GetStreamAsync(_stream, cancellationToken: Token)).Info.State.ConsumerCount
+        );
     }
 
     private async Task CreateConsumerAsync() =>
@@ -426,7 +539,11 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
             Token
         ) ?? throw new InvalidOperationException("Expected a delivery.");
 
-    private async Task PublishAsync(byte[] bytes, string suffix = "a", NatsHeaders? headers = null) =>
+    private async Task PublishAsync(
+        byte[] bytes,
+        string suffix = "a",
+        NatsHeaders? headers = null
+    ) =>
         (
             await _js.PublishAsync(
                 $"{_subject}.{suffix}",
@@ -457,7 +574,10 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         var timer = Stopwatch.StartNew();
         while (!await ready())
         {
-            Assert.True(timer.Elapsed < TimeSpan.FromSeconds(20), "Timed out waiting for durable intake.");
+            Assert.True(
+                timer.Elapsed < TimeSpan.FromSeconds(20),
+                "Timed out waiting for durable intake."
+            );
             await Task.Delay(50, Token);
         }
     }
@@ -493,7 +613,10 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
         public NeverCalledHandler() =>
             throw new InvalidOperationException("Intake must not construct business handlers.");
 
-        public Task<InboxResult> HandleAsync(TestDb db, JsonElement message, CancellationToken token) =>
-            throw new NotSupportedException();
+        public Task<InboxResult> HandleAsync(
+            TestDb db,
+            JsonElement message,
+            CancellationToken token
+        ) => throw new NotSupportedException();
     }
 }

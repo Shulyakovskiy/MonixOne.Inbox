@@ -16,7 +16,7 @@ public sealed class InboxDiagnostics(ILogger<InboxDiagnostics> logger) : IDispos
 
     // Leave room for the diagnostic entry/array around an envelope accepted at the standard JSON depth.
     private static readonly JsonSerializerOptions _jsonOptions = new() { MaxDepth = 128 };
-    private readonly object _gate = new();
+    private readonly Lock _gate = new();
     private readonly List<JsonElement> _entries = [];
     private Guid? _attemptId;
     private int _bytes = 2;
@@ -72,7 +72,9 @@ public sealed class InboxDiagnostics(ILogger<InboxDiagnostics> logger) : IDispos
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            attemptId = _attemptId ?? throw new InvalidOperationException("No active OrderedInbox business attempt.");
+            attemptId =
+                _attemptId
+                ?? throw new InvalidOperationException("No active OrderedInbox business attempt.");
             var bytes = JsonSerializer.SerializeToUtf8Bytes(
                 new
                 {
@@ -89,7 +91,10 @@ public sealed class InboxDiagnostics(ILogger<InboxDiagnostics> logger) : IDispos
                 _dropped++;
             else
             {
-                using var json = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 128 });
+                using var json = JsonDocument.Parse(
+                    bytes,
+                    new JsonDocumentOptions { MaxDepth = 128 }
+                );
                 _entries.Add(json.RootElement.Clone());
                 _bytes += bytes.Length + 1;
             }

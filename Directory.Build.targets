@@ -1,0 +1,13 @@
+<Project>
+  <Target
+    Name="ConfigureGitHooks"
+    BeforeTargets="PrepareForBuild"
+    Condition="'$(DesignTimeBuild)' != 'true' and '$(CI)' != 'true' and Exists('$(MSBuildThisFileDirectory).git') and Exists('$(MSBuildThisFileDirectory).githooks/pre-commit')"
+  >
+    <!-- Git supplies the shell for the temporary alias, including on Git for Windows. -->
+    <Exec
+      Command="git -c &quot;alias.configure-hooks=!sh .githooks/configure&quot; configure-hooks"
+      WorkingDirectory="$(MSBuildThisFileDirectory)"
+    />
+  </Target>
+</Project>

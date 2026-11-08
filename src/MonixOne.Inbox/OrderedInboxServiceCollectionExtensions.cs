@@ -42,7 +42,9 @@ public static class OrderedInboxServiceCollectionExtensions
             && d.ServiceType != typeof(InboxRegistration<TDbContext>)
         );
         if (otherContext is not null)
-            throw new InvalidOperationException("OrderedInbox uses one application DbContext per service provider.");
+            throw new InvalidOperationException(
+                "OrderedInbox uses one application DbContext per service provider."
+            );
 
         var registration = GetRegistration<TDbContext>(services);
         if (configure is not null)
@@ -73,7 +75,9 @@ public static class OrderedInboxServiceCollectionExtensions
             }
         });
         // The common schema barrier is registered once; all future subscription workers must await it.
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, InboxStartup<TDbContext>>());
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostedService, InboxStartup<TDbContext>>()
+        );
         services.TryAddScoped<InboxIntakeStore<TDbContext>>();
         services.TryAddScoped<InboxDiagnostics>();
         services.TryAddScoped<InboxAdministration<TDbContext>>(provider =>
@@ -83,9 +87,15 @@ public static class OrderedInboxServiceCollectionExtensions
             )
         );
         services.TryAddScoped<InboxProcessor<TDbContext>>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, InboxDispatcher<TDbContext>>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, InboxMetricsReporter<TDbContext>>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, InboxHistoryCleanup<TDbContext>>());
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostedService, InboxDispatcher<TDbContext>>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostedService, InboxMetricsReporter<TDbContext>>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostedService, InboxHistoryCleanup<TDbContext>>()
+        );
         if (services.All(d => d.ServiceType != typeof(InboxIntake<TDbContext>)))
         {
             services.AddSingleton<InboxIntake<TDbContext>>();
@@ -96,10 +106,14 @@ public static class OrderedInboxServiceCollectionExtensions
         return new(services, registration);
     }
 
-    private static InboxRegistration<TDbContext> GetRegistration<TDbContext>(IServiceCollection services)
+    private static InboxRegistration<TDbContext> GetRegistration<TDbContext>(
+        IServiceCollection services
+    )
         where TDbContext : DbContext
     {
-        var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(InboxRegistration<TDbContext>));
+        var descriptor = services.FirstOrDefault(d =>
+            d.ServiceType == typeof(InboxRegistration<TDbContext>)
+        );
         if (descriptor?.ImplementationInstance is InboxRegistration<TDbContext> existing)
             return existing;
 

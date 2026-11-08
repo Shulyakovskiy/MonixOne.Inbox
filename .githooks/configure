@@ -1,0 +1,30 @@
+#!/bin/sh
+set -eu
+
+cd "$(git rev-parse --show-toplevel)"
+config_lock=$(git rev-parse --git-path config.lock)
+
+for attempt in 1 2 3 4 5; do
+    configured_path=$(git config --local --get --default '' core.hooksPath)
+    if [ "$configured_path" = '.githooks' ]; then
+        break
+    fi
+
+    if config_error=$(git config --local core.hooksPath .githooks 2>&1); then
+        break
+    fi
+
+    configured_path=$(git config --local --get --default '' core.hooksPath)
+    if [ "$configured_path" = '.githooks' ]; then
+        break
+    fi
+
+    if [ "$attempt" -eq 5 ] || [ ! -f "$config_lock" ]; then
+        printf '%s\n' "$config_error" >&2
+        exit 1
+    fi
+
+    sleep 1
+done
+
+dotnet tool restore

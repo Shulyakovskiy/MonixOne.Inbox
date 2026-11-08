@@ -43,8 +43,11 @@
     <None Include="../../docs/event-processing.svg" Pack="true" PackagePath="docs/" />
   </ItemGroup>
   <!-- NuGet.org требует абсолютные URL изображений; локальный README сохраняет относительные ссылки. -->
-  <UsingTask TaskName="WriteInboxPackageReadme" TaskFactory="RoslynCodeTaskFactory"
-             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+  <UsingTask
+    TaskName="WriteInboxPackageReadme"
+    TaskFactory="RoslynCodeTaskFactory"
+    AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll"
+  >
     <ParameterGroup>
       <SourceFile ParameterType="System.String" Required="true" />
       <DestinationFile ParameterType="System.String" Required="true" />
@@ -52,7 +55,8 @@
     </ParameterGroup>
     <Task>
       <Using Namespace="System.IO" />
-      <Code Type="Fragment" Language="cs"><![CDATA[
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
         // File IO preserves backslashes in JSON examples; MSBuild item values may normalize them as paths.
         var content = File.ReadAllText(SourceFile)
             .Replace("(docs/event-processing.png)", "(" + ImageBaseUrl + "event-processing.png)")
@@ -61,12 +65,15 @@
         Directory.CreateDirectory(Path.GetDirectoryName(destination));
         if (!File.Exists(destination) || File.ReadAllText(destination) != content)
             File.WriteAllText(destination, content, new System.Text.UTF8Encoding(false));
-      ]]></Code>
+      ]]>
+      </Code>
     </Task>
   </UsingTask>
   <Target Name="PrepareInboxPackageReadme" BeforeTargets="_GetPackageFiles">
-    <WriteInboxPackageReadme SourceFile="$(MSBuildThisFileDirectory)../../README.md"
-                             DestinationFile="$(_InboxPackageReadmePath)"
-                             ImageBaseUrl="https://raw.githubusercontent.com/Shulyakovskiy/MonixOne.Inbox/main/docs/" />
+    <WriteInboxPackageReadme
+      SourceFile="$(MSBuildThisFileDirectory)../../README.md"
+      DestinationFile="$(_InboxPackageReadmePath)"
+      ImageBaseUrl="https://raw.githubusercontent.com/Shulyakovskiy/MonixOne.Inbox/main/docs/"
+    />
   </Target>
 </Project>
