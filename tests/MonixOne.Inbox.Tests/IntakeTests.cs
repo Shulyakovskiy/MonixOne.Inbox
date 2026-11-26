@@ -203,6 +203,31 @@ public sealed class IntakeTests(PostgreSqlFixture infrastructure) : IAsyncLifeti
     }
 
     [Fact]
+    public async Task Missing_durable_is_recreated_after_pull_returns_no_responders()
+    {
+        var host = HostFor(configureServices: services =>
+            services.Remove(
+                services.Single(d => d.ImplementationType == typeof(InboxStartup<TestDb>))
+            )
+        );
+        var intake = host.Services.GetRequiredService<InboxIntake<TestDb>>();
+        await intake.PrepareAsync(Token);
+
+        // Remove the durable after binding but before the first pull, so the server returns 503.
+        Assert.True(await _js.DeleteConsumerAsync(_stream, "locations", Token));
+        await PublishAsync(Event("created-1", 1));
+        var retry = Stopwatch.StartNew();
+        host.Services.GetRequiredService<InboxStartupBarrier>().Complete();
+        await host.StartAsync(Token);
+
+        await UntilAsync(async () => await CountAsync("inbox") == 1);
+        Assert.True(retry.Elapsed >= TimeSpan.FromSeconds(1));
+        await UntilAsync(async () =>
+            (await _js.GetConsumerAsync(_stream, "locations", Token)).Info.NumAckPending == 0
+        );
+    }
+
+    [Fact]
     public async Task Conflict_links_both_originals_and_keeps_all_keys_available()
     {
         var host = HostFor();

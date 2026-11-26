@@ -5,7 +5,7 @@ Ordered inbox для .NET 10, EF Core, PostgreSQL и NATS JetStream.
 и durable pull consumers. Отдельные `DbSet` для inbox не нужны.
 
 > [!NOTE]
-> **Версия пакета:** `1.1.2`.
+> **Версия пакета:** `1.1.3`.
 > **NuGet:** [MonixOne.Inbox](https://www.nuget.org/packages/MonixOne.Inbox).
 > **Лицензия:** [MIT](https://github.com/Shulyakovskiy/MonixOne.Inbox/blob/main/LICENSE).
 

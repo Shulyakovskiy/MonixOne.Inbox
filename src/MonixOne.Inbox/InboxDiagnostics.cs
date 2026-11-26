@@ -16,7 +16,7 @@ public sealed class InboxDiagnostics(ILogger<InboxDiagnostics> logger) : IDispos
 
     // Leave room for the diagnostic entry/array around an envelope accepted at the standard JSON depth.
     private static readonly JsonSerializerOptions _jsonOptions = new() { MaxDepth = 128 };
-    private readonly object _gate = new();
+    private readonly Lock _gate = new();
     private readonly List<JsonElement> _entries = [];
     private Guid? _attemptId;
     private int _bytes = 2;
