@@ -148,6 +148,7 @@ internal sealed class InboxIntake<TDbContext>(
             {
                 if (worker.Consumer is null)
                     await BindAsync(worker, token);
+                var noResponders = false;
                 var inFlight = new HashSet<Task>();
                 try
                 {
@@ -157,6 +158,12 @@ internal sealed class InboxIntake<TDbContext>(
                             {
                                 MaxMsgs = worker.Settings.BatchSize,
                                 Expires = TimeSpan.FromSeconds(2),
+                                NotificationHandler = (notification, _) =>
+                                {
+                                    if (notification is NatsJSNoRespondersNotification)
+                                        noResponders = true;
+                                    return Task.CompletedTask;
+                                },
                             },
                             NatsRawSerializer<byte[]>.Default,
                             token
@@ -178,6 +185,9 @@ internal sealed class InboxIntake<TDbContext>(
                     // Even after one failure, independent saves already running can finish and ACK.
                     await Task.WhenAll(inFlight);
                 }
+                // FetchAsync drains its notifications on disposal and ends normally on a 503.
+                if (noResponders)
+                    throw new NatsNoRespondersException();
                 failures = 0;
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
